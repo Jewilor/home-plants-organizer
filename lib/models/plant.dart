@@ -7,6 +7,7 @@ DateTime addDays(DateTime date, int days) =>
 bool sameDay(DateTime a, DateTime b) => dateOnly(a) == dateOnly(b);
 
 enum WateringStatus { overdue, today, upcoming }
+
 enum CareType { watering, feeding, repotting }
 
 extension CareTypeLabel on CareType {
@@ -18,8 +19,14 @@ extension CareTypeLabel on CareType {
 }
 
 class Plant {
-  const Plant({required this.id, required this.name, required this.species,
-    required this.room, required this.nextWatering, required this.art});
+  const Plant({
+    required this.id,
+    required this.name,
+    required this.species,
+    required this.room,
+    required this.nextWatering,
+    required this.art,
+  });
   final String id;
   final String name;
   final String species;
@@ -37,7 +44,11 @@ class Plant {
 }
 
 class CareProcedure {
-  const CareProcedure({required this.plantId, required this.date, required this.type});
+  const CareProcedure({
+    required this.plantId,
+    required this.date,
+    required this.type,
+  });
   final String plantId;
   final DateTime date;
   final CareType type;
