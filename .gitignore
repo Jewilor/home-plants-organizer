@@ -1,0 +1,13 @@
+.dart_tool/
+.flutter-plugins*
+.packages
+build/
+**/local.properties
+**/.gradle/
+*.iml
+.idea/
+tools/*.html
+tools/*releases.json
+reports/*-render/
+reports/qa/
+*.log
