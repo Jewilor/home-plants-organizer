@@ -10,7 +10,7 @@
 
 ## Запуск в Android Studio
 
-1. Откройте `D:\Development\home-plants-organizer` в Android Studio. Плагины Flutter и Dart уже установлены.
+1. Откройте `D:\\4 kurs\\Development for iphone and ipad` в Android Studio. Плагины Flutter и Dart уже установлены.
 2. Укажите Flutter SDK: `D:\Development\flutter`.
 3. Запустите `Plants_API_36` в Device Manager.
 4. Откройте `lib/main.dart`, выберите устройство и нажмите Run.
@@ -19,3 +19,4 @@
 Проверки: `flutter analyze` и `flutter test`.
 
 Требования и этапы: `docs/requirements.md`. Отчёт: `reports`. Снимки: `screenshots/lab1`.
+
