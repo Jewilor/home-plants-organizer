@@ -57,6 +57,37 @@ void main() {
     expect(model.visibleMonth, DateTime(2027, 1));
     model.dispose();
   });
+
+  test('Plant and procedure editing stays linked and watering can be undone', () {
+    final model = GardenViewModel(clock: () => DateTime(2026, 9, 16));
+    final original = model.plants.first;
+    final procedure = model.procedures.firstWhere((p) => p.plantId == original.id);
+    model.savePlant(id: original.id, name: 'Новая монстера', species: original.species,
+      room: 'Балкон');
+    expect(model.plantFor(procedure).name, 'Новая монстера');
+    model.saveProcedure(id: procedure.id, plantId: original.id,
+      date: DateTime(2026, 9, 20), type: procedure.type);
+    expect(model.proceduresOn(DateTime(2026, 9, 20)).single.plantId, original.id);
+    model.toggleWateredToday(original.id);
+    expect(model.plants.firstWhere((p) => p.id == original.id).statusAt(model.today), WateringStatus.watered);
+    model.toggleWateredToday(original.id);
+    expect(model.plants.firstWhere((p) => p.id == original.id).statusAt(model.today), WateringStatus.upcoming);
+    model.deletePlant(original.id);
+    expect(model.plants.any((p) => p.id == original.id), isFalse);
+    expect(model.procedures.any((p) => p.plantId == original.id), isFalse);
+    model.dispose();
+  });
+
+  test('Can create and delete an unscheduled plant and a procedure', () {
+    final model = GardenViewModel(clock: () => DateTime(2026, 9, 16));
+    final id = model.savePlant(name: 'Каланхоэ');
+    expect(model.plants.any((p) => p.id == id), isTrue);
+    final procedureId = model.saveProcedure(plantId: id, date: DateTime(2026, 9, 25), type: CareType.feeding);
+    expect(model.procedures.any((p) => p.id == procedureId), isTrue);
+    model.deleteProcedure(procedureId);
+    expect(model.procedures.any((p) => p.id == procedureId), isFalse);
+    model.dispose();
+  });
   testWidgets('Phone catalog displays cards and overdue background', (
     tester,
   ) async {

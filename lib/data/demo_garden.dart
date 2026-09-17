@@ -41,7 +41,7 @@ class DemoGarden {
       for (final plant in plants)
         CareProcedure(
           plantId: plant.id,
-          date: plant.nextWatering,
+          date: plant.nextWatering!,
           type: CareType.watering,
         ),
       CareProcedure(plantId: 'monstera', date: today, type: CareType.feeding),

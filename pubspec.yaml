@@ -1,5 +1,5 @@
 name: home_plants_organizer
-description: Мобильный органайзер домашних растений. Лабораторная работа 1.
+description: Мобильный органайзер домашних растений с календарём ухода.
 publish_to: none
 version: 1.0.0+1
 environment:
