@@ -21,6 +21,7 @@ const months = [
   'Ноябрь',
   'Декабрь',
 ];
+
 String shortDate(DateTime date) =>
     '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}';
 const heading = TextStyle(
@@ -158,6 +159,8 @@ class _GardenScreenState extends State<GardenScreen>
             child: LayoutBuilder(
               builder: (context, constraints) => SingleChildScrollView(
                 key: ValueKey('page-$tab'),
+                // Ограниченная прокрутка убирает эффект растягивания на Android.
+                physics: const ClampingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                 child: constraints.maxWidth >= 850
                     ? Row(
