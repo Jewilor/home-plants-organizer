@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'views/garden_screen.dart';
 
+/// Запускает приложение Flutter.
 void main() => runApp(const PlantApp());
 
+/// Корневой виджет приложения с русской локалью и темой Material 3.
 class PlantApp extends StatelessWidget {
   const PlantApp({super.key});
   @override

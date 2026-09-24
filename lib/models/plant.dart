@@ -1,12 +1,18 @@
+/// Возвращает дату без времени для календарного сравнения.
 DateTime dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
+/// Прибавляет указанное количество календарных дней.
 DateTime addDays(DateTime date, int days) =>
     DateTime(date.year, date.month, date.day + days);
+/// Проверяет совпадение двух дат без учёта времени.
 bool sameDay(DateTime a, DateTime b) => dateOnly(a) == dateOnly(b);
 
+/// Состояние полива растения, используемое для оформления карточки.
 enum WateringStatus { overdue, today, upcoming, watered, unscheduled }
 
+/// Вид процедуры ухода за комнатным растением.
 enum CareType { watering, feeding, repotting }
 
+/// Предоставляет русское название для вида процедуры.
 extension CareTypeLabel on CareType {
   String get label => switch (this) {
     CareType.watering => 'Полив',
@@ -15,6 +21,7 @@ extension CareTypeLabel on CareType {
   };
 }
 
+/// Модель комнатного растения и вычисляемых сведений о поливе.
 class Plant {
   const Plant({
     required this.id,
@@ -34,6 +41,7 @@ class Plant {
   final DateTime? lastWateredOn;
   final int art;
 
+  /// Возвращает состояние полива относительно указанной даты.
   WateringStatus statusAt(DateTime now) {
     if (lastWateredOn != null && sameDay(lastWateredOn!, now)) {
       return WateringStatus.watered;
@@ -47,6 +55,7 @@ class Plant {
   }
 }
 
+/// Модель одной процедуры ухода, связанной с растением по идентификатору.
 class CareProcedure {
   const CareProcedure({
     this.id = '',
@@ -63,8 +72,10 @@ class CareProcedure {
   final DateTime? completedOn;
   // Only an automatically created same-day watering log is removed on undo.
   final bool quickLog;
+  /// Показывает, была ли процедура отмечена выполненной.
   bool get isCompleted => completedOn != null;
 
+  /// Создаёт копию процедуры с новой отметкой выполнения.
   CareProcedure withCompletion(DateTime? value) => CareProcedure(
     id: id,
     plantId: plantId,

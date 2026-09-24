@@ -22,6 +22,7 @@ const months = [
   'Декабрь',
 ];
 
+/// Форматирует дату для краткого отображения в заголовке.
 String shortDate(DateTime date) =>
     '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}';
 const heading = TextStyle(
@@ -30,6 +31,7 @@ const heading = TextStyle(
   color: ink,
 );
 
+/// Главный экран каталога растений и календаря процедур.
 class GardenScreen extends StatefulWidget {
   const GardenScreen({super.key, this.viewModel});
   final GardenViewModel? viewModel;
@@ -66,6 +68,7 @@ class _GardenScreenState extends State<GardenScreen>
     super.dispose();
   }
 
+  /// Открывает форму создания или изменения растения.
   void editPlant([Plant? plant]) {
     showDialog<void>(
       context: context,
@@ -73,6 +76,7 @@ class _GardenScreenState extends State<GardenScreen>
     );
   }
 
+  /// Открывает форму создания или изменения процедуры.
   void editProcedure([CareProcedure? procedure]) {
     if (model.plants.isEmpty) return;
     showDialog<void>(
@@ -81,6 +85,7 @@ class _GardenScreenState extends State<GardenScreen>
     );
   }
 
+  /// Показывает подтверждение перед удалением записи.
   Future<void> confirmDelete(
     String title,
     String description,
@@ -511,6 +516,7 @@ class _GardenScreenState extends State<GardenScreen>
   }
 }
 
+/// Карточка растения с состоянием полива и доступными действиями.
 class PlantCard extends StatelessWidget {
   const PlantCard({
     super.key,
@@ -673,6 +679,7 @@ class PlantCard extends StatelessWidget {
 }
 
 /// Vector illustration drawn locally: no network or external image dependencies.
+/// Локально рисует простую иллюстрацию растения без внешних ресурсов.
 class PlantPainter extends CustomPainter {
   PlantPainter(this.variant);
   final int variant;

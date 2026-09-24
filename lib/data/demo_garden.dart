@@ -1,6 +1,7 @@
 import '../models/plant.dart';
 
 /// Demonstration fixture for lab 1, anchored to the first launch date.
+/// Создаёт набор демонстрационных растений и процедур для первой лабораторной.
 class DemoGarden {
   DemoGarden(DateTime today) {
     plants = [

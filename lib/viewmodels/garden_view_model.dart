@@ -2,6 +2,9 @@ import 'package:flutter/foundation.dart';
 import '../data/demo_garden.dart';
 import '../models/plant.dart';
 
+/// Состояние каталога растений и календаря процедур.
+///
+/// Изменения публикуются через [ChangeNotifier] для обновления интерфейса.
 class GardenViewModel extends ChangeNotifier {
   GardenViewModel({DateTime Function()? clock, DemoGarden? garden})
     : _clock = clock ?? DateTime.now {
@@ -30,7 +33,9 @@ class GardenViewModel extends ChangeNotifier {
   int _sequence = 0;
   String _newId(String prefix) => '$prefix-${_sequence++}';
 
+  /// Возвращает процедуры только для чтения.
   List<CareProcedure> get procedures => List.unmodifiable(_procedures);
+  /// Возвращает растения с актуальными сроками полива.
   List<Plant> get plants => List.unmodifiable(
     _plants.map((plant) {
       final watering = _procedures.where(
@@ -56,13 +61,17 @@ class GardenViewModel extends ChangeNotifier {
       );
     }),
   );
+  /// Возвращает количество растений с просроченным поливом.
   int get overdueCount =>
       plants.where((p) => p.statusAt(today) == WateringStatus.overdue).length;
+  /// Возвращает процедуры, назначенные на выбранную календарную дату.
   List<CareProcedure> proceduresOn(DateTime date) =>
       _procedures.where((p) => sameDay(p.date, date)).toList();
+  /// Находит растение, связанное с процедурой.
   Plant plantFor(CareProcedure procedure) =>
       plants.firstWhere((p) => p.id == procedure.plantId);
 
+  /// Добавляет растение или сохраняет изменения существующей записи.
   String savePlant({
     String? id,
     required String name,
@@ -105,12 +114,14 @@ class GardenViewModel extends ChangeNotifier {
     return plant.id;
   }
 
+  /// Удаляет растение и все связанные с ним процедуры.
   void deletePlant(String id) {
     _plants.removeWhere((p) => p.id == id);
     _procedures.removeWhere((p) => p.plantId == id);
     notifyListeners();
   }
 
+  /// Добавляет или изменяет процедуру календаря.
   String saveProcedure({
     String? id,
     required String plantId,
@@ -158,6 +169,7 @@ class GardenViewModel extends ChangeNotifier {
     return procedure.id;
   }
 
+  /// Удаляет процедуру по её идентификатору.
   void deleteProcedure(String id) {
     _procedures.removeWhere((p) => p.id == id);
     notifyListeners();
@@ -165,6 +177,7 @@ class GardenViewModel extends ChangeNotifier {
 
   /// A watering today satisfies all overdue/today watering entries, never future ones.
   /// Clicking again restores the original schedule and removes only generated logs.
+  /// Отмечает сегодняшнее выполнение полива или отменяет эту отметку.
   void toggleWateredToday(String plantId) {
     refreshToday();
     if (!_plants.any((p) => p.id == plantId)) return;
@@ -212,23 +225,27 @@ class GardenViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Выбирает день и синхронизирует отображаемый месяц.
   void selectDay(DateTime date) {
     selectedDate = dateOnly(date);
     visibleMonth = DateTime(date.year, date.month);
     notifyListeners();
   }
 
+  /// Переключает календарь на соседний месяц.
   void changeMonth(int offset) {
     visibleMonth = DateTime(visibleMonth.year, visibleMonth.month + offset);
     selectedDate = visibleMonth;
     notifyListeners();
   }
 
+  /// Возвращает календарь к текущей дате.
   void goToToday() {
     refreshToday();
     selectDay(today);
   }
 
+  /// Обновляет текущую дату после смены суток или возврата в приложение.
   void refreshToday() {
     final current = dateOnly(_clock());
     if (current != today) {

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import '../models/plant.dart';
 import '../viewmodels/garden_view_model.dart';
 
+/// Форматирует дату для отображения в русскоязычном интерфейсе.
 String fullDate(DateTime date) =>
     '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
 
+/// Кнопка выбора даты с открытием стандартного календаря Flutter.
 class DateField extends StatelessWidget {
   const DateField({super.key, required this.date, required this.onChanged});
   final DateTime date;
@@ -26,6 +28,7 @@ class DateField extends StatelessWidget {
   );
 }
 
+/// Диалог добавления или редактирования растения.
 class PlantEditor extends StatefulWidget {
   const PlantEditor({super.key, required this.model, this.plant});
   final GardenViewModel model;
@@ -152,6 +155,7 @@ class _PlantEditorState extends State<PlantEditor> {
   );
 }
 
+/// Диалог добавления или редактирования процедуры ухода.
 class ProcedureEditor extends StatefulWidget {
   const ProcedureEditor({super.key, required this.model, this.procedure});
   final GardenViewModel model;
