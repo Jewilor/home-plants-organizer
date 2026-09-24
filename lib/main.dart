@@ -12,6 +12,9 @@ class PlantApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     title: 'Листва — домашние растения',
     debugShowCheckedModeBanner: false,
+    // Физика ограничивает смещение, а эта настройка убирает растягивание
+    // содержимого на границах всех списков и форм приложения.
+    scrollBehavior: const MaterialScrollBehavior().copyWith(overscroll: false),
     locale: const Locale('ru'),
     supportedLocales: const [Locale('ru')],
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
