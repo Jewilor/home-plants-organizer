@@ -1,7 +1,7 @@
 name: home_plants_organizer
 description: Мобильный органайзер домашних растений с календарём ухода.
 publish_to: none
-version: 1.0.0+1
+version: 1.1.0+2
 environment:
   sdk: '>=3.8.0 <4.0.0'
 dependencies:
@@ -9,9 +9,18 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  image_picker: ^1.2.3
+  google_mlkit_text_recognition: ^0.17.1
+  path_provider: ^2.1.5
+
 dev_dependencies:
+  integration_test:
+    sdk: flutter
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
 flutter:
   uses-material-design: true
+  assets:
+    - assets/botanical_profiles.json
+    - assets/labels/

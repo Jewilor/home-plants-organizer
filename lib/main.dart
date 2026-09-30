@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'views/garden_screen.dart';
+import 'viewmodels/garden_view_model.dart';
 
 /// Запускает приложение Flutter.
 void main() => runApp(const PlantApp());
 
 /// Корневой виджет приложения с русской локалью и темой Material 3.
 class PlantApp extends StatelessWidget {
-  const PlantApp({super.key});
+  const PlantApp({super.key, this.viewModel});
+
+  /// Необязательная зависимость для воспроизводимой проверки приложения.
+  final GardenViewModel? viewModel;
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'Листва — домашние растения',
@@ -24,6 +28,6 @@ class PlantApp extends StatelessWidget {
       scaffoldBackgroundColor: const Color(0xFFF7F8F2),
       fontFamily: 'Roboto',
     ),
-    home: const GardenScreen(),
+    home: GardenScreen(viewModel: viewModel),
   );
 }

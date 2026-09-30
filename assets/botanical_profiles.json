@@ -1,0 +1,47 @@
+[
+  {
+    "name": "Монстера",
+    "species": "Monstera deliciosa",
+    "aliases": [
+      "Монстера",
+      "Monstera deliciosa"
+    ],
+    "light": "Яркий рассеянный свет без прямого полуденного солнца.",
+    "humidity": "Умеренная или повышенная влажность воздуха.",
+    "source": "https://www.rhs.org.uk/plants/11192/monstera-deliciosa-f/details"
+  },
+  {
+    "name": "Фикус",
+    "species": "Ficus elastica",
+    "aliases": [
+      "Фикус",
+      "Ficus elastica"
+    ],
+    "light": "Яркий рассеянный или фильтрованный свет.",
+    "humidity": "Умеренная влажность воздуха; избегать чрезмерно сухого воздуха.",
+    "source": "https://www.rhs.org.uk/plants/ornamental-figs/growing-guide/"
+  },
+  {
+    "name": "Спатифиллум",
+    "species": "Spathiphyllum wallisii",
+    "aliases": [
+      "Спатифиллум",
+      "Spathiphyllum wallisii"
+    ],
+    "light": "Непрямой свет; защищать листья от прямого солнца.",
+    "humidity": "Умеренная влажность воздуха, постоянное тепло.",
+    "source": "https://www.rhs.org.uk/plants/peace-lilies"
+  },
+  {
+    "name": "Сансевиерия",
+    "species": "Dracaena trifasciata",
+    "aliases": [
+      "Сансевиерия",
+      "Dracaena trifasciata",
+      "Sansevieria trifasciata"
+    ],
+    "light": "Предпочитает яркое место; переносит лёгкую тень.",
+    "humidity": "Низкая влажность воздуха; дополнительное опрыскивание не требуется.",
+    "source": "https://www.rhs.org.uk/plants/sansevieria/growing-guide"
+  }
+]

@@ -8,8 +8,14 @@ String fullDate(DateTime date) =>
 
 /// Кнопка выбора даты с открытием стандартного календаря Flutter.
 class DateField extends StatelessWidget {
-  const DateField({super.key, required this.date, required this.onChanged});
+  const DateField({
+    super.key,
+    required this.date,
+    required this.onChanged,
+    this.lastDate,
+  });
   final DateTime date;
+  final DateTime? lastDate;
   final ValueChanged<DateTime> onChanged;
   @override
   Widget build(BuildContext context) => OutlinedButton.icon(
@@ -21,7 +27,7 @@ class DateField extends StatelessWidget {
         context: context,
         initialDate: date,
         firstDate: DateTime(1900),
-        lastDate: DateTime(2200, 12, 31),
+        lastDate: lastDate ?? DateTime(2200, 12, 31),
       );
       if (picked != null && context.mounted) onChanged(picked);
     },
@@ -44,6 +50,7 @@ class _PlantEditorState extends State<PlantEditor> {
   late final TextEditingController room;
   late DateTime date;
   bool schedule = true;
+  bool weekly = false;
   String? error;
   @override
   void initState() {
@@ -71,6 +78,7 @@ class _PlantEditorState extends State<PlantEditor> {
         species: species.text,
         room: room.text,
         firstWatering: widget.plant == null && schedule ? date : null,
+        weekly: weekly,
       );
       Navigator.pop(context);
     } on ArgumentError catch (e) {
@@ -123,6 +131,11 @@ class _PlantEditorState extends State<PlantEditor> {
                   onChanged: (value) => setState(() => schedule = value!),
                 ),
                 if (schedule)
+                  WeeklyChoice(
+                    value: weekly,
+                    onChanged: (v) => setState(() => weekly = v),
+                  ),
+                if (schedule)
                   DateField(
                     date: date,
                     onChanged: (value) => setState(() => date = value),
@@ -168,6 +181,7 @@ class _ProcedureEditorState extends State<ProcedureEditor> {
   late String plantId;
   late CareType type;
   late DateTime date;
+  bool weekly = false;
   String? error;
   @override
   void initState() {
@@ -175,6 +189,7 @@ class _ProcedureEditorState extends State<ProcedureEditor> {
     plantId = widget.procedure?.plantId ?? widget.model.plants.first.id;
     type = widget.procedure?.type ?? CareType.watering;
     date = widget.procedure?.date ?? widget.model.selectedDate;
+    weekly = widget.procedure?.weekly ?? false;
   }
 
   void save() {
@@ -184,6 +199,7 @@ class _ProcedureEditorState extends State<ProcedureEditor> {
         plantId: plantId,
         type: type,
         date: date,
+        weekly: weekly,
       );
       Navigator.pop(context);
     } on ArgumentError catch (e) {
@@ -242,6 +258,13 @@ class _ProcedureEditorState extends State<ProcedureEditor> {
               date: date,
               onChanged: (value) => setState(() => date = value),
             ),
+            const SizedBox(height: 12),
+            WeeklyChoice(
+              value: weekly,
+              onChanged: (v) => setState(() => weekly = v),
+            ),
+            if (widget.procedure?.weekly ?? false)
+              const Text('Изменения применяются ко всей серии повторений.'),
             if (widget.procedure?.isCompleted ?? false)
               const Padding(
                 padding: EdgeInsets.only(top: 12),
@@ -270,6 +293,32 @@ class _ProcedureEditorState extends State<ProcedureEditor> {
         key: const ValueKey('save-procedure'),
         onPressed: save,
         child: const Text('Сохранить'),
+      ),
+    ],
+  );
+}
+
+/// Переключатель повторения процедуры с интервалом семь календарных дней.
+class WeeklyChoice extends StatelessWidget {
+  const WeeklyChoice({super.key, required this.value, required this.onChanged});
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      FilterChip(
+        key: const ValueKey('weekly-choice'),
+        label: const Text('Еженедельно'),
+        avatar: const Icon(Icons.repeat, size: 18),
+        selected: value,
+        onSelected: onChanged,
+      ),
+      Text(
+        value
+            ? 'Повторять каждые 7 дней с выбранной даты'
+            : 'Процедура на одну дату',
+        style: Theme.of(context).textTheme.bodySmall,
       ),
     ],
   );

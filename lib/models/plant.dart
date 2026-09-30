@@ -1,8 +1,10 @@
 /// Возвращает дату без времени для календарного сравнения.
 DateTime dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
+
 /// Прибавляет указанное количество календарных дней.
 DateTime addDays(DateTime date, int days) =>
     DateTime(date.year, date.month, date.day + days);
+
 /// Проверяет совпадение двух дат без учёта времени.
 bool sameDay(DateTime a, DateTime b) => dateOnly(a) == dateOnly(b);
 
@@ -63,15 +65,35 @@ class CareProcedure {
     required this.date,
     required this.type,
     this.completedOn,
-    this.quickLog = false,
+    this.weekly = false,
   });
   final String id;
   final String plantId;
   final DateTime date;
   final CareType type;
   final DateTime? completedOn;
-  // Only an automatically created same-day watering log is removed on undo.
-  final bool quickLog;
+
+  /// Повторять процедуру каждые семь календарных дней от даты начала.
+  final bool weekly;
+
+  /// Проверяет, относится ли день к однократной процедуре или недельной серии.
+  bool occursOn(DateTime day) {
+    final start = dateOnly(date);
+    final target = dateOnly(day);
+    return sameDay(start, target) ||
+        (weekly && !target.isBefore(start) && start.weekday == target.weekday);
+  }
+
+  /// Создаёт отображаемый экземпляр серии для конкретной даты.
+  CareProcedure occurrence(DateTime day, DateTime? completion) => CareProcedure(
+    id: id,
+    plantId: plantId,
+    date: dateOnly(day),
+    type: type,
+    weekly: weekly,
+    completedOn: completion,
+  );
+
   /// Показывает, была ли процедура отмечена выполненной.
   bool get isCompleted => completedOn != null;
 
@@ -82,6 +104,6 @@ class CareProcedure {
     date: date,
     type: type,
     completedOn: value,
-    quickLog: quickLog,
+    weekly: weekly,
   );
 }

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/plant.dart';
 import '../viewmodels/garden_view_model.dart';
 import 'editors.dart';
+import 'plant_detail_screen.dart';
+import 'label_scan_screen.dart';
 
 const forest = Color(0xFF285B43);
 const ink = Color(0xFF20392D);
@@ -81,7 +83,10 @@ class _GardenScreenState extends State<GardenScreen>
     if (model.plants.isEmpty) return;
     showDialog<void>(
       context: context,
-      builder: (_) => ProcedureEditor(model: model, procedure: procedure),
+      builder: (_) => ProcedureEditor(
+        model: model,
+        procedure: procedure == null ? null : model.procedureById(procedure.id),
+      ),
     );
   }
 
@@ -245,6 +250,18 @@ class _GardenScreenState extends State<GardenScreen>
         icon: const Icon(Icons.add),
         label: const Text('Добавить растение'),
       ),
+      const SizedBox(height: 8),
+      OutlinedButton.icon(
+        key: const ValueKey('scan-label'),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => LabelScanScreen(garden: model),
+          ),
+        ),
+        icon: const Icon(Icons.document_scanner_outlined),
+        label: const Text('Сканировать этикетку'),
+      ),
       const SizedBox(height: 12),
       if (model.plants.isEmpty)
         const Text('В саду пока нет растений. Добавьте первое растение.'),
@@ -257,10 +274,17 @@ class _GardenScreenState extends State<GardenScreen>
             onEdit: () => editPlant(plant),
             onDelete: () => confirmDelete(
               'Удалить растение?',
-              '«${plant.name}» и все его процедуры будут удалены из календаря.',
+              '«${plant.name}», расписание и журнал ухода будут удалены.',
               () => model.deletePlant(plant.id),
             ),
             onWater: () => model.toggleWateredToday(plant.id),
+            onDetails: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    PlantDetailScreen(garden: model, plantId: plant.id),
+              ),
+            ),
           ),
         ),
       const SizedBox(height: 8),
@@ -488,7 +512,7 @@ class _GardenScreenState extends State<GardenScreen>
                 style: const TextStyle(fontWeight: FontWeight.w700, color: ink),
               ),
               subtitle: Text(
-                '${model.plantFor(procedure).name}${procedure.isCompleted ? '\nВыполнено ${fullDate(procedure.completedOn!)}' : ''}',
+                '${model.plantFor(procedure).name}${procedure.weekly ? '\nЕженедельно' : ''}${procedure.isCompleted ? '\nВыполнено ${fullDate(procedure.completedOn!)}' : ''}',
               ),
               trailing: PopupMenuButton<String>(
                 key: ValueKey('procedure-menu-${procedure.id}'),
@@ -498,8 +522,12 @@ class _GardenScreenState extends State<GardenScreen>
                     editProcedure(procedure);
                   } else {
                     confirmDelete(
-                      'Удалить процедуру?',
-                      '${procedure.type.label}: ${model.plantFor(procedure).name}, ${fullDate(procedure.date)}.',
+                      procedure.weekly
+                          ? 'Удалить еженедельную серию?'
+                          : 'Удалить процедуру?',
+                      procedure.weekly
+                          ? 'Все повторения этой процедуры будут удалены. Выполненный уход останется в журнале.'
+                          : '${procedure.type.label}: ${model.plantFor(procedure).name}, ${fullDate(procedure.date)}.',
                       () => model.deleteProcedure(procedure.id),
                     );
                   }
@@ -525,10 +553,11 @@ class PlantCard extends StatelessWidget {
     this.onEdit,
     this.onDelete,
     this.onWater,
+    this.onDetails,
   });
   final Plant plant;
   final DateTime today;
-  final VoidCallback? onEdit, onDelete, onWater;
+  final VoidCallback? onEdit, onDelete, onWater, onDetails;
   @override
   Widget build(BuildContext context) {
     final status = plant.statusAt(today);
@@ -656,6 +685,12 @@ class PlantCard extends StatelessWidget {
                   : 'Следующий полив: ${fullDate(plant.nextWatering!)}',
               style: const TextStyle(fontSize: 12, color: muted),
             ),
+          TextButton.icon(
+            key: ValueKey('details-${plant.id}'),
+            onPressed: onDetails,
+            icon: const Icon(Icons.info_outline, size: 18),
+            label: const Text('Справка и журнал ухода'),
+          ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
             key: ValueKey('water-${plant.id}'),
