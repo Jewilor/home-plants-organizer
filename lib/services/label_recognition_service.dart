@@ -73,5 +73,7 @@ class MlKitLabelRecognitionService implements LabelRecognitionService {
   }
 
   @override
-  Future<void> close() => _recognizer.close();
+  Future<void> close() async {
+    if (supported) await _recognizer.close();
+  }
 }
