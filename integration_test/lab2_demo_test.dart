@@ -80,12 +80,69 @@ void main() {
     await tap(find.byKey(const ValueKey('details-monstera')));
     debugPrint('SCENARIO: details');
     await shot('03_botanical_profile');
+    await tap(find.byTooltip('Назад'));
+    await tap(find.byKey(const ValueKey('add-plant')));
+    await tester.enterText(
+      find.byKey(const ValueKey('plant-name')),
+      'Аглаонема',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('plant-species')),
+      'Aglaonema commutatum',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('plant-room')),
+      'Гостиная',
+    );
+    final conditionsField = find.byKey(const ValueKey('plant-care-conditions'));
+    await tester.ensureVisible(conditionsField);
+    await tester.enterText(
+      conditionsField,
+      'Рассеянный свет. Повышенная влажность воздуха.',
+    );
+    FocusManager.instance.primaryFocus?.unfocus();
+    await SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+    await tester.pump(const Duration(milliseconds: 600));
+    await shot('04_manual_add');
+    await tap(find.byKey(const ValueKey('save-plant')));
+    final aglaonema = model.plants.singleWhere((p) => p.name == 'Аглаонема');
+    expect(
+      aglaonema.careConditions,
+      'Рассеянный свет. Повышенная влажность воздуха.',
+    );
+    await tap(find.byKey(ValueKey('plant-menu-${aglaonema.id}')));
+    await tap(find.text('Редактировать'));
+    expect(
+      tester.widget<TextFormField>(conditionsField).controller!.text,
+      aglaonema.careConditions,
+    );
+    await tester.ensureVisible(conditionsField);
+    await tester.enterText(
+      conditionsField,
+      'Рассеянный свет. Повышенная влажность воздуха. Беречь от прямых солнечных лучей.',
+    );
+    FocusManager.instance.primaryFocus?.unfocus();
+    await SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+    await tester.pump(const Duration(milliseconds: 600));
+    await shot('05_manual_edit');
+    await tap(find.byKey(const ValueKey('save-plant')));
+    await tap(find.byKey(ValueKey('details-${aglaonema.id}')));
+    expect(find.text('Сведения введены пользователем.'), findsOneWidget);
+    expect(
+      find.text(
+        'Рассеянный свет. Повышенная влажность воздуха. Беречь от прямых солнечных лучей.',
+      ),
+      findsOneWidget,
+    );
+    await shot('06_manual_profile');
+    await tap(find.byTooltip('Назад'));
+    await tap(find.byKey(const ValueKey('details-monstera')));
     await tap(find.text('Все'));
     await tester.drag(
       find.byType(SingleChildScrollView).first,
       const Offset(0, -350),
     );
-    await shot('04_care_history');
+    await shot('07_care_history');
     await tap(find.byKey(const ValueKey('record-care')));
     await tester.enterText(
       find.byType(TextField).last,
@@ -94,7 +151,7 @@ void main() {
     FocusManager.instance.primaryFocus?.unfocus();
     await SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
     await tester.pump(const Duration(milliseconds: 600));
-    await shot('05_record_care');
+    await shot('08_record_care');
     await tap(find.widgetWithText(FilledButton, 'Сохранить'));
     expect(
       model.records
@@ -106,12 +163,12 @@ void main() {
       1,
     );
     await tap(find.text('Полив').first);
-    await shot('06_history_filter');
+    await shot('09_history_filter');
     await tap(find.byTooltip('Назад'));
     await tester.pump(const Duration(milliseconds: 500));
     debugPrint('SCENARIO: scan');
     await tap(find.byKey(const ValueKey('scan-label')));
-    await shot('07_label_sources');
+    await shot('10_label_sources');
     await tap(find.widgetWithText(ActionChip, 'Монстера'));
     for (
       var i = 0;
@@ -126,9 +183,9 @@ void main() {
       find.byType(SingleChildScrollView).first,
       const Offset(0, -260),
     );
-    await shot('08_label_result');
+    await shot('11_label_result');
     await tap(find.widgetWithText(FilledButton, 'Добавить в мои растения'));
-    expect(model.plants.length, 5);
+    expect(model.plants.length, 6);
     await tester.pumpWidget(const SizedBox.shrink());
     model.dispose();
   });
