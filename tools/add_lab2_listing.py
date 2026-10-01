@@ -16,7 +16,7 @@ from build_lab2_report import blank, style_paragraph
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE_REVISION = '7f6c856'
-LAB2_REVISION = '7563070'
+LAB2_REVISION = 'a16d4e4'
 SOURCE = ROOT / 'reports/Лабораторная работа №2.docx'
 OUTPUT = ROOT / 'reports/Лабораторная работа №2 с листингом.docx'
 TEXT_SOURCE = SOURCE.with_suffix('.md')
@@ -39,6 +39,7 @@ FILES = (
     'lib/views/label_scan_screen.dart',
     'lib/main.dart',
     'test/lab2_test.dart',
+    'test/care_conditions_test.dart',
     'integration_test/lab2_demo_test.dart',
     'test_driver/lab2_screenshots.dart',
 )

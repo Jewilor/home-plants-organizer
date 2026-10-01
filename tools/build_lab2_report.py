@@ -165,6 +165,16 @@ def build():
     d.core_properties.title='Лабораторная работа 2 Мобильный органайзер домашних растений'
     d.core_properties.author='Заяц М. С.'
     d.core_properties.last_modified_by='Заяц М. С.'
+    # Keep drawing identifiers unique across the template and inserted figures.
+    drawing_id = 1
+    parts = [d.part]
+    parts.extend(part for part in d.part.related_parts.values()
+                 if hasattr(part, 'element'))
+    for part in parts:
+        for node in part.element.iter():
+            if node.tag == '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}docPr':
+                node.set('id', str(drawing_id))
+                drawing_id += 1
     d.save(ROOT/'reports/Лабораторная работа №2.docx')
 
 
