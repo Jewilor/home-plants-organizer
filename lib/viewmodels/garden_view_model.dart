@@ -97,6 +97,7 @@ class GardenViewModel extends ChangeNotifier {
         name: plant.name,
         species: plant.species,
         room: plant.room,
+        careConditions: plant.careConditions,
         art: plant.art,
         nextWatering: pending.isEmpty ? null : pending.first,
         lastWateredOn: completed.isEmpty ? null : completed.last,
@@ -124,6 +125,7 @@ class GardenViewModel extends ChangeNotifier {
     required String name,
     String species = '',
     String room = '',
+    String? careConditions,
     DateTime? firstWatering,
     bool weekly = false,
   }) {
@@ -131,7 +133,8 @@ class GardenViewModel extends ChangeNotifier {
     if (clean.isEmpty) throw ArgumentError('Введите название растения.');
     if (clean.length > 80 ||
         species.trim().length > 100 ||
-        room.trim().length > 60) {
+        room.trim().length > 60 ||
+        (careConditions?.trim().length ?? 0) > 2000) {
       throw ArgumentError('Сократите слишком длинное поле.');
     }
     final index = id == null ? -1 : _plants.indexWhere((p) => p.id == id);
@@ -141,6 +144,9 @@ class GardenViewModel extends ChangeNotifier {
       name: clean,
       species: species.trim(),
       room: room.trim(),
+      careConditions:
+          (careConditions ?? (index < 0 ? '' : _plants[index].careConditions))
+              .trim(),
       art: index < 0 ? _sequence % 4 : _plants[index].art,
     );
     if (index < 0) {

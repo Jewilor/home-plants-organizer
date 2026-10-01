@@ -48,6 +48,7 @@ class _PlantEditorState extends State<PlantEditor> {
   late final TextEditingController name;
   late final TextEditingController species;
   late final TextEditingController room;
+  late final TextEditingController careConditions;
   late DateTime date;
   bool schedule = true;
   bool weekly = false;
@@ -58,6 +59,9 @@ class _PlantEditorState extends State<PlantEditor> {
     name = TextEditingController(text: widget.plant?.name ?? '');
     species = TextEditingController(text: widget.plant?.species ?? '');
     room = TextEditingController(text: widget.plant?.room ?? '');
+    careConditions = TextEditingController(
+      text: widget.plant?.careConditions ?? '',
+    );
     date = widget.model.today;
   }
 
@@ -66,6 +70,7 @@ class _PlantEditorState extends State<PlantEditor> {
     name.dispose();
     species.dispose();
     room.dispose();
+    careConditions.dispose();
     super.dispose();
   }
 
@@ -77,6 +82,7 @@ class _PlantEditorState extends State<PlantEditor> {
         name: name.text,
         species: species.text,
         room: room.text,
+        careConditions: careConditions.text,
         firstWatering: widget.plant == null && schedule ? date : null,
         weekly: weekly,
       );
@@ -122,6 +128,19 @@ class _PlantEditorState extends State<PlantEditor> {
                 controller: room,
                 maxLength: 60,
                 decoration: const InputDecoration(labelText: 'Комната'),
+              ),
+              TextFormField(
+                key: const ValueKey('plant-care-conditions'),
+                controller: careConditions,
+                minLines: 3,
+                maxLines: 5,
+                maxLength: 2000,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  labelText: 'Условия содержания',
+                  helperText: 'Освещение, влажность и другие условия ухода.',
+                  helperMaxLines: 2,
+                ),
               ),
               if (widget.plant == null) ...[
                 CheckboxListTile(

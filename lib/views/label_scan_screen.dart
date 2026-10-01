@@ -16,7 +16,6 @@ class _LabelScanScreenState extends State<LabelScanScreen> {
   late final LabelScanViewModel model;
   final name = TextEditingController();
   final species = TextEditingController();
-  final room = TextEditingController();
   String _lastSuggestion = '';
   String? saveError;
   @override
@@ -31,10 +30,11 @@ class _LabelScanScreenState extends State<LabelScanScreen> {
   }
 
   void _update() {
-    if (model.suggestion != _lastSuggestion) {
-      _lastSuggestion = model.suggestion;
+    final result = '${model.suggestion}\n${model.speciesSuggestion}';
+    if (result != _lastSuggestion) {
+      _lastSuggestion = result;
       name.text = model.profile?.name ?? model.suggestion;
-      species.text = model.profile?.species ?? model.suggestion;
+      species.text = model.speciesSuggestion;
     }
   }
 
@@ -44,17 +44,12 @@ class _LabelScanScreenState extends State<LabelScanScreen> {
     model.dispose();
     name.dispose();
     species.dispose();
-    room.dispose();
     super.dispose();
   }
 
   void save() {
     try {
-      widget.garden.savePlant(
-        name: name.text,
-        species: species.text,
-        room: room.text,
-      );
+      widget.garden.savePlant(name: name.text, species: species.text);
       Navigator.pop(context);
     } on ArgumentError catch (e) {
       setState(() => saveError = e.message.toString());
@@ -73,7 +68,7 @@ class _LabelScanScreenState extends State<LabelScanScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'Снимите этикетку с латинским названием растения. Распознанный текст можно исправить перед сохранением.',
+              'Снимите этикетку с латинским названием растения. Проверьте название и вид растения перед добавлением.',
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
@@ -122,16 +117,9 @@ class _LabelScanScreenState extends State<LabelScanScreen> {
                 model.error!,
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
-            if (model.rawText.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              const Text(
-                'Распознанный текст',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              SelectableText(model.rawText),
-            ],
             const SizedBox(height: 20),
             TextField(
+              key: const ValueKey('scan-plant-name'),
               controller: name,
               maxLength: 80,
               decoration: const InputDecoration(
@@ -139,15 +127,17 @@ class _LabelScanScreenState extends State<LabelScanScreen> {
               ),
             ),
             TextField(
+              key: const ValueKey('scan-plant-species'),
               controller: species,
               maxLength: 100,
-              decoration: const InputDecoration(labelText: 'Вид растения'),
+              decoration: const InputDecoration(
+                labelText: 'Вид растения',
+                helperText:
+                    'Заполняется, если ботаническое имя есть на этикетке.',
+                helperMaxLines: 2,
+              ),
             ),
-            TextField(
-              controller: room,
-              maxLength: 60,
-              decoration: const InputDecoration(labelText: 'Комната'),
-            ),
+
             if (saveError != null)
               Text(
                 saveError!,

@@ -65,7 +65,26 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 12),
-                    if (model.loading)
+                    if (plant.careConditions.isNotEmpty)
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Условия содержания',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 12),
+                              SelectableText(plant.careConditions),
+                              const SizedBox(height: 12),
+                              const Text('Сведения введены пользователем.'),
+                            ],
+                          ),
+                        ),
+                      )
+                    else if (model.loading)
                       const LinearProgressIndicator()
                     else if (model.error != null) ...[
                       Text(model.error!),
@@ -75,7 +94,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                       ),
                     ] else if (profile == null)
                       const Text(
-                        'Для этого вида сведений в локальном справочнике пока нет. Уточните поле «Вид растения».',
+                        'Сведения для этого растения пока не добавлены в локальный справочник. Введите условия содержания в форме редактирования растения или проверьте написание поля «Вид растения».',
                       )
                     else
                       Card(
@@ -103,9 +122,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                               ),
                               Text(profile.humidity),
                               const SizedBox(height: 12),
-                              const Text(
-                                'Источник: Королевское садоводческое общество',
-                              ),
+                              Text('Источник: ${profile.sourceName}'),
                               SelectableText(
                                 profile.source,
                                 style: Theme.of(context).textTheme.bodySmall,

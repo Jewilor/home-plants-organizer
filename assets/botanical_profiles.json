@@ -43,5 +43,18 @@
     "light": "Предпочитает яркое место; переносит лёгкую тень.",
     "humidity": "Низкая влажность воздуха; дополнительное опрыскивание не требуется.",
     "source": "https://www.rhs.org.uk/plants/sansevieria/growing-guide"
+  },
+  {
+    "name": "Аглаонема",
+    "species": "Aglaonema",
+    "aliases": [
+      "Аглаонема",
+      "Aglaonema",
+      "Aglaonema commutatum"
+    ],
+    "light": "Общие условия для рода Aglaonema: рассеянный или непрямой свет; переносит затенение.",
+    "humidity": "Предпочитает повышенную влажность воздуха, но переносит более сухой воздух.",
+    "source": "https://plants.ces.ncsu.edu/plants/aglaonema/",
+    "sourceName": "Университет штата Северная Каролина"
   }
 ]

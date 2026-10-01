@@ -30,6 +30,7 @@ class Plant {
     required this.name,
     required this.species,
     required this.room,
+    this.careConditions = '',
     this.nextWatering,
     this.lastWateredOn,
     required this.art,
@@ -38,6 +39,9 @@ class Plant {
   final String name;
   final String species;
   final String room;
+
+  /// Условия содержания, введённые пользователем для конкретного растения.
+  final String careConditions;
   // These dates are derived by the ViewModel from the procedures.
   final DateTime? nextWatering;
   final DateTime? lastWateredOn;

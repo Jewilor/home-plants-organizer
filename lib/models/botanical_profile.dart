@@ -7,8 +7,12 @@ class BotanicalProfile {
     required this.light,
     required this.humidity,
     required this.source,
+    this.sourceName = 'Королевское садоводческое общество',
   });
   final String name, species, light, humidity, source;
+
+  /// Название организации, подготовившей исходные справочные сведения.
+  final String sourceName;
   final List<String> aliases;
 
   /// Преобразует запись локального справочника в модель предметной области.
@@ -20,5 +24,8 @@ class BotanicalProfile {
         light: json['light'] as String,
         humidity: json['humidity'] as String,
         source: json['source'] as String,
+        sourceName:
+            json['sourceName'] as String? ??
+            'Королевское садоводческое общество',
       );
 }

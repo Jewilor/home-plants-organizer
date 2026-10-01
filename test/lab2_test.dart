@@ -237,11 +237,63 @@ void main() {
     'The asset repository contains profiles and unknown species has no guessed advice',
     () async {
       final profiles = await AssetBotanicalRepository().load();
-      expect(profiles.length, 4);
+      expect(profiles.length, 5);
       expect(profileFor(profiles, 'Unknown plant', 'Новая'), isNull);
       expect(
         profileFor(profiles, 'Dracaena trifasciata', 'Переименована')?.name,
         'Сансевиерия',
+      );
+    },
+  );
+  test(
+    'Aglaonema resolves by Latin name and Russian name after a typo',
+    () async {
+      final profiles = await AssetBotanicalRepository().load();
+      final bySpecies = profileFor(profiles, '  aglaonema  ', 'Любимая');
+      expect(bySpecies?.name, 'Аглаонема');
+      expect(bySpecies?.sourceName, 'Университет штата Северная Каролина');
+      expect(profileFor(profiles, 'Agloanema', 'Аглаонема'), same(bySpecies));
+      expect(profileFor(profiles, 'Agloanema', 'Любимая'), isNull);
+      expect(
+        profileFor(profiles, 'Aglaonema commutatum', 'Любимая'),
+        same(bySpecies),
+      );
+    },
+  );
+  test('Price and currency never become the suggested name', () {
+    expect(LabelScanViewModel.suggestName('ЦЕНА\nBYN\n19,90', []), isEmpty);
+    expect(
+      LabelScanViewModel.suggestName('Calathea orbifolia\nЦена 19,90 BYN', []),
+      'Calathea orbifolia',
+    );
+  });
+  test(
+    'Species is filled only when its name is present on the label',
+    () async {
+      final profiles = await AssetBotanicalRepository().load();
+      expect(
+        LabelScanViewModel.suggestSpecies(
+          'AGLAONEMA\nPrice 12.90',
+          profiles,
+          'Aglaonema',
+        ),
+        isEmpty,
+      );
+      expect(
+        LabelScanViewModel.suggestSpecies(
+          'Aglaonema commutatum\nPrice 12.90',
+          profiles,
+          'Aglaonema',
+        ),
+        'Aglaonema commutatum',
+      );
+      expect(
+        LabelScanViewModel.suggestSpecies(
+          'Calathea orbifolia\nPrice 12.90',
+          profiles,
+          'Calathea orbifolia',
+        ),
+        'Calathea orbifolia',
       );
     },
   );
@@ -255,10 +307,12 @@ void main() {
       );
       await model.scanSample('fixture');
       expect(model.suggestion, 'Monstera deliciosa');
+      expect(model.speciesSuggestion, 'Monstera deliciosa');
       expect(model.profile?.name, 'Монстера');
       service.text = null;
       await model.scanCamera();
       expect(model.suggestion, 'Monstera deliciosa');
+      expect(model.speciesSuggestion, 'Monstera deliciosa');
       expect(model.busy, isFalse);
       expect(model.error, isNull);
       model.dispose();

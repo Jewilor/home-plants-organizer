@@ -12,8 +12,10 @@ class LabelScanViewModel extends ChangeNotifier {
   final BotanicalRepository repository;
   bool busy = false;
   bool _disposed = false;
-  String rawText = '';
   String suggestion = '';
+
+  /// Ботаническое имя, найденное в тексте этикетки; пусто, если вид не указан.
+  String speciesSuggestion = '';
   String? error;
   BotanicalProfile? profile;
 
@@ -31,12 +33,38 @@ class LabelScanViewModel extends ChangeNotifier {
               s.length >= 3 &&
               RegExp(r'[A-Za-zА-Яа-я]').hasMatch(s) &&
               !RegExp(
-                r'\d|price|garden|plants|eur|usd',
+                r'\d|price|garden|plants|eur|usd|byn|цена|руб|[$€£₽]',
                 caseSensitive: false,
               ).hasMatch(s),
         )
         .toList();
     return lines.isEmpty ? '' : lines.first;
+  }
+
+  /// Заполняет вид только ботаническим именем, присутствующим на этикетке.
+  static String suggestSpecies(
+    String raw,
+    List<BotanicalProfile> profiles,
+    String name,
+  ) {
+    final botanicalName = RegExp(r'^[A-Za-z]+ [A-Za-z-]+$');
+    final knownNames =
+        {
+            for (final profile in profiles) ...[
+              profile.species,
+              ...profile.aliases,
+            ],
+          }.where((value) => botanicalName.hasMatch(value)).toList()
+          ..sort((a, b) => b.length.compareTo(a.length));
+    for (final candidate in knownNames) {
+      final pattern = RegExp(
+        r'\b' + RegExp.escape(candidate).replaceAll(' ', r'\s+') + r'\b',
+        caseSensitive: false,
+      );
+      if (pattern.hasMatch(raw)) return candidate;
+    }
+    // Незнакомое ботаническое имя предлагается пользователю для подтверждения.
+    return RegExp(r'^[A-Z][a-z]+ [a-z][a-z-]+$').hasMatch(name) ? name : '';
   }
 
   Future<void> _run(Future<String?> Function() operation) async {
@@ -49,9 +77,9 @@ class LabelScanViewModel extends ChangeNotifier {
       if (raw != null && !_disposed) {
         final profiles = await repository.load();
         if (_disposed) return;
-        rawText = raw;
         suggestion = suggestName(raw, profiles);
-        profile = profileFor(profiles, suggestion, suggestion);
+        speciesSuggestion = suggestSpecies(raw, profiles, suggestion);
+        profile = profileFor(profiles, speciesSuggestion, suggestion);
         if (suggestion.isEmpty) {
           error =
               'Название не выделено. Введите его вручную или повторите снимок.';
