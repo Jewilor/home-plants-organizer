@@ -109,17 +109,6 @@ class _GardenScreenState extends State<GardenScreen>
         title: Text(title),
         content: Text(description),
         actions: [
-          IconButton(
-            key: const ValueKey('reminders-screen'),
-            tooltip: 'Напоминания',
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (_) => RemindersScreen(garden: model),
-              ),
-            ),
-          ),
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Отмена'),
