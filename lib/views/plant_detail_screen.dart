@@ -6,6 +6,7 @@ import '../services/botanical_repository.dart';
 import '../viewmodels/garden_view_model.dart';
 import '../viewmodels/plant_detail_view_model.dart';
 import 'editors.dart';
+import 'care_guide_screen.dart';
 
 /// Детальный экран растения с ботанической справкой и журналом ухода.
 class PlantDetailScreen extends StatefulWidget {
@@ -66,6 +67,26 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                         'Семейство: ${widget.garden.references?.find(ReferenceKind.family, plant.familyId)?.name ?? 'Запись недоступна'}',
                       ),
                     const SizedBox(height: 24),
+                    if (widget.garden.encyclopedia != null) ...[
+                      FilledButton.icon(
+                        key: const ValueKey('remote-care'),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => CareGuideScreen(
+                              garden: widget.garden,
+                              plantId: widget.plantId,
+                            ),
+                          ),
+                        ),
+                        icon: const Icon(Icons.travel_explore),
+                        label: const Text('Получить регламент ухода'),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    if (widget.garden.careGuideFor(widget.plantId)
+                        case final guide?)
+                      CareGuideCard(guide: guide, saved: true),
                     Text(
                       'Ботаническая справка',
                       style: Theme.of(context).textTheme.titleLarge,

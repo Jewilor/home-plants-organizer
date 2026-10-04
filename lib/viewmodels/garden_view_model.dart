@@ -6,6 +6,10 @@ import '../models/garden_snapshot.dart';
 import '../models/reference_entry.dart';
 import '../services/garden_repository.dart';
 import 'reference_view_model.dart';
+import '../models/care_guide.dart';
+import '../models/reminder.dart';
+import '../services/plant_encyclopedia.dart';
+import '../services/reminder_service.dart';
 
 /// Управляет садом и последовательно сохраняет его состояние в основной базе.
 /// Представления подписываются на изменения через [ChangeNotifier].
@@ -15,6 +19,8 @@ class GardenViewModel extends ChangeNotifier {
     DemoGarden? garden,
     this.repository,
     this.references,
+    this.encyclopedia,
+    this.reminderService,
     GardenSnapshot? snapshot,
   }) : _clock = clock ?? DateTime.now {
     today = dateOnly(_clock());
@@ -28,6 +34,8 @@ class GardenViewModel extends ChangeNotifier {
         _completions[entry.key] = Map.of(entry.value);
       }
       _sequence = snapshot.sequence;
+      _careGuides.addAll(snapshot.careGuides);
+      _reminderPreferences = snapshot.reminderPreferences;
       _watchReferences();
       return;
     }
@@ -60,6 +68,16 @@ class GardenViewModel extends ChangeNotifier {
   }
   final GardenRepository? repository;
   final ReferenceViewModel? references;
+  final PlantEncyclopedia? encyclopedia;
+  final ReminderService? reminderService;
+  final Map<String, CareGuide> _careGuides = {};
+  ReminderPreferences _reminderPreferences = const ReminderPreferences();
+  List<CareReminder> _scheduledReminders = [];
+  String? notificationIssue;
+  ReminderPreferences get reminderPreferences => _reminderPreferences;
+  List<CareReminder> get scheduledReminders =>
+      List.unmodifiable(_scheduledReminders);
+  CareGuide? careGuideFor(String plantId) => _careGuides[plantId];
   Future<void> _writes = Future.value();
   int _pendingWrites = 0;
   bool _disposed = false;
@@ -74,6 +92,8 @@ class GardenViewModel extends ChangeNotifier {
     records: _records,
     completions: _completions,
     sequence: _sequence,
+    careGuides: _careGuides,
+    reminderPreferences: _reminderPreferences,
   );
 
   void _watchReferences() {
@@ -98,7 +118,7 @@ class GardenViewModel extends ChangeNotifier {
 
   /// Ставит неизменяемый снимок в очередь: поздняя запись не обгоняет раннюю.
   void _saveChanged() {
-    if (repository == null) {
+    if (repository == null && reminderService == null) {
       notifyListeners();
       return;
     }
@@ -107,7 +127,10 @@ class GardenViewModel extends ChangeNotifier {
     storageError = null;
     notifyListeners();
     _writes = _writes
-        .then((_) => repository!.save(state))
+        .then((_) async {
+          await repository?.save(state);
+          await _syncNotifications(state);
+        })
         .then(
           (_) {
             storageError = null;
@@ -165,15 +188,15 @@ class GardenViewModel extends ChangeNotifier {
   CareProcedure procedureById(String id) =>
       _procedures.firstWhere((p) => p.id == id);
 
-  DateTime? _completion(CareProcedure p, DateTime day) => p.weekly
+  DateTime? _completion(CareProcedure p, DateTime day) => p.repeats
       ? (_completions[p.id] ?? const <DateTime, DateTime>{})[dateOnly(day)]
       : p.completedOn;
 
   DateTime? _nextPending(CareProcedure p) {
-    if (!p.weekly) return p.isCompleted ? null : p.date;
+    if (!p.repeats) return p.isCompleted ? null : p.date;
     var day = dateOnly(p.date);
     while (_completion(p, day) != null) {
-      day = addDays(day, 7);
+      day = addDays(day, p.intervalDays);
     }
     return day;
   }
@@ -296,13 +319,21 @@ class GardenViewModel extends ChangeNotifier {
     _procedures.removeWhere((p) => p.plantId == id);
     _completions.removeWhere((key, _) => ids.contains(key));
     _records.removeWhere((r) => r.plantId == id);
+    _careGuides.remove(id);
     _saveChanged();
   }
 
   bool _overlaps(CareProcedure a, CareProcedure b) {
-    if (a.weekly && b.weekly) return a.date.weekday == b.date.weekday;
-    if (a.weekly) return a.occursOn(b.date);
-    if (b.weekly) return b.occursOn(a.date);
+    if (a.repeats && b.repeats) {
+      final difference = DateTime.utc(
+        a.date.year,
+        a.date.month,
+        a.date.day,
+      ).difference(DateTime.utc(b.date.year, b.date.month, b.date.day)).inDays;
+      return difference % a.intervalDays.gcd(b.intervalDays) == 0;
+    }
+    if (a.repeats) return a.occursOn(b.date);
+    if (b.repeats) return b.occursOn(a.date);
     return sameDay(a.date, b.date);
   }
 
@@ -315,9 +346,15 @@ class GardenViewModel extends ChangeNotifier {
     required CareType type,
     bool weekly = false,
     String fertilizerId = '',
+    int repeatEveryDays = 0,
   }) {
     if (!_plants.any((p) => p.id == plantId)) {
       throw ArgumentError('Выберите существующее растение.');
+    }
+    if (repeatEveryDays < 0 || repeatEveryDays > 365) {
+      throw ArgumentError(
+        'Интервал должен быть от 1 до 365 дней либо 0 для одной даты.',
+      );
     }
     final fertilizer = type == CareType.feeding ? fertilizerId : '';
     if (fertilizer.isNotEmpty &&
@@ -336,7 +373,8 @@ class GardenViewModel extends ChangeNotifier {
         old.plantId == plantId &&
         old.type == type &&
         sameDay(old.date, day) &&
-        old.weekly == weekly;
+        old.weekly == weekly &&
+        old.repeatEveryDays == repeatEveryDays;
     final p = CareProcedure(
       id: id ?? _newId('procedure'),
       plantId: plantId,
@@ -344,6 +382,7 @@ class GardenViewModel extends ChangeNotifier {
       type: type,
       weekly: weekly,
       fertilizerId: fertilizer,
+      repeatEveryDays: repeatEveryDays,
       completedOn: unchanged ? old.completedOn : null,
     );
     if (_procedures.any(
@@ -380,12 +419,12 @@ class GardenViewModel extends ChangeNotifier {
     for (var i = 0; i < _procedures.length; i++) {
       final p = _procedures[i];
       if (p.plantId != plantId || p.type != type) continue;
-      if (p.weekly) {
+      if (p.repeats) {
         final entries = _completions.putIfAbsent(p.id, () => {});
         for (
           var day = dateOnly(p.date);
           !day.isAfter(performedOn);
-          day = addDays(day, 7)
+          day = addDays(day, p.intervalDays)
         ) {
           entries.putIfAbsent(day, () => performedOn);
         }
@@ -456,7 +495,7 @@ class GardenViewModel extends ChangeNotifier {
     for (var i = 0; i < _procedures.length; i++) {
       final p = _procedures[i];
       if (p.plantId != plantId || p.type != CareType.watering) continue;
-      if (p.weekly) {
+      if (p.repeats) {
         _completions[p.id]?.removeWhere(
           (_, completed) => sameDay(completed, today),
         );
@@ -465,6 +504,114 @@ class GardenViewModel extends ChangeNotifier {
       }
     }
     _saveChanged();
+  }
+
+  /// Сохраняет полученную справку и атомарно заменяет расписание полива при выборе.
+  /// Другие виды ухода, ручные условия содержания и фактический журнал сохраняются.
+  Future<void> applyCareGuide(
+    String plantId,
+    CareGuide guide, {
+    DateTime? firstWatering,
+    int? intervalDays,
+  }) async {
+    if (!_plants.any((p) => p.id == plantId)) {
+      throw ArgumentError('Растение уже удалено.');
+    }
+    if (firstWatering != null &&
+        (intervalDays == null || intervalDays < 1 || intervalDays > 365)) {
+      throw ArgumentError('Укажите интервал полива от 1 до 365 дней.');
+    }
+    _careGuides[plantId] = guide;
+    if (firstWatering != null) {
+      final removed = _procedures
+          .where((p) => p.plantId == plantId && p.type == CareType.watering)
+          .map((p) => p.id)
+          .toSet();
+      _procedures.removeWhere((p) => removed.contains(p.id));
+      _completions.removeWhere((key, _) => removed.contains(key));
+      _procedures.add(
+        CareProcedure(
+          id: _newId('procedure'),
+          plantId: plantId,
+          date: dateOnly(firstWatering),
+          type: CareType.watering,
+          weekly: intervalDays == 7,
+          repeatEveryDays: intervalDays == 7 ? 0 : intervalDays!,
+        ),
+      );
+    }
+    _saveChanged();
+    await flush();
+  }
+
+  /// Синхронизирует системную очередь только после успешного сохранения состояния.
+  /// Ошибка уведомлений не скрывает результат записи базы данных.
+  Future<void> _syncNotifications(GardenSnapshot state) async {
+    final service = reminderService;
+    if (service == null) return;
+    try {
+      final allowed = await service.permitted();
+      final planned = state.reminderPreferences.enabled && allowed
+          ? planReminders(state, _clock())
+          : <CareReminder>[];
+      await service.replace(planned);
+      _scheduledReminders = planned;
+      notificationIssue = state.reminderPreferences.enabled && !allowed
+          ? 'Разрешите уведомления для «Листва» в настройках Android.'
+          : null;
+    } catch (_) {
+      _scheduledReminders = [];
+      notificationIssue =
+          'Не удалось обновить напоминания. Нажмите «Обновить напоминания».';
+    }
+    if (!_disposed) notifyListeners();
+  }
+
+  /// Восстанавливает очередь при запуске или возвращении приложения на экран.
+  Future<void> refreshReminders() {
+    final state = snapshot;
+    _writes = _writes.then((_) => _syncNotifications(state));
+    return _writes;
+  }
+
+  /// Запрашивает системное разрешение после нажатия пользователем переключателя.
+  Future<bool> configureReminders({
+    required bool enabled,
+    int? hour,
+    int? minute,
+  }) async {
+    final service = reminderService;
+    if (service == null) return false;
+    final h = hour ?? _reminderPreferences.hour;
+    final m = minute ?? _reminderPreferences.minute;
+    if (h < 0 || h > 23 || m < 0 || m > 59) {
+      throw ArgumentError('Некорректное время.');
+    }
+    if (enabled && !await service.requestPermission()) {
+      notificationIssue =
+          'Разрешение не предоставлено. Включите уведомления для «Листва» в настройках Android.';
+      if (!_disposed) notifyListeners();
+      return false;
+    }
+    _reminderPreferences = ReminderPreferences(
+      enabled: enabled,
+      hour: h,
+      minute: m,
+    );
+    _saveChanged();
+    await flush();
+    return true;
+  }
+
+  /// Отправляет настоящее системное уведомление для самостоятельной проверки.
+  Future<void> testNotification() async {
+    final service = reminderService;
+    if (service == null || !await service.requestPermission()) {
+      throw ArgumentError(
+        'Для проверки разрешите уведомления в настройках Android.',
+      );
+    }
+    await service.showTest();
   }
 
   /// Выбирает календарный день и соответствующий месяц.

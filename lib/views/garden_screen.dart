@@ -8,6 +8,7 @@ import '../viewmodels/garden_view_model.dart';
 import 'editors.dart';
 import 'plant_detail_screen.dart';
 import 'label_scan_screen.dart';
+import 'reminders_screen.dart';
 
 const forest = Color(0xFF285B43);
 const ink = Color(0xFF20392D);
@@ -62,7 +63,10 @@ class _GardenScreenState extends State<GardenScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) model.refreshToday();
+    if (state == AppLifecycleState.resumed) {
+      model.refreshToday();
+      unawaited(model.refreshReminders());
+    }
   }
 
   @override
@@ -105,6 +109,17 @@ class _GardenScreenState extends State<GardenScreen>
         title: Text(title),
         content: Text(description),
         actions: [
+          IconButton(
+            key: const ValueKey('reminders-screen'),
+            tooltip: 'Напоминания',
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => RemindersScreen(garden: model),
+              ),
+            ),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Отмена'),
@@ -141,6 +156,17 @@ class _GardenScreenState extends State<GardenScreen>
           ],
         ),
         actions: [
+          IconButton(
+            key: const ValueKey('reminders-screen'),
+            tooltip: 'Напоминания',
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => RemindersScreen(garden: model),
+              ),
+            ),
+          ),
           if (model.references != null)
             IconButton(
               key: const ValueKey('reference-catalog'),
@@ -526,7 +552,7 @@ class _GardenScreenState extends State<GardenScreen>
                 style: const TextStyle(fontWeight: FontWeight.w700, color: ink),
               ),
               subtitle: Text(
-                '${model.plantFor(procedure).name}${procedure.fertilizerId.isEmpty ? '' : '\nУдобрение: ${model.references?.find(ReferenceKind.fertilizer, procedure.fertilizerId)?.name ?? 'Запись недоступна'}'}${procedure.weekly ? '\nЕженедельно' : ''}${procedure.isCompleted ? '\nВыполнено ${fullDate(procedure.completedOn!)}' : ''}',
+                '${model.plantFor(procedure).name}${procedure.fertilizerId.isEmpty ? '' : '\nУдобрение: ${model.references?.find(ReferenceKind.fertilizer, procedure.fertilizerId)?.name ?? 'Запись недоступна'}'}${procedure.repeats ? '\n${procedure.repeatLabel}' : ''}${procedure.isCompleted ? '\nВыполнено ${fullDate(procedure.completedOn!)}' : ''}',
               ),
               trailing: PopupMenuButton<String>(
                 key: ValueKey('procedure-menu-${procedure.id}'),
@@ -536,10 +562,10 @@ class _GardenScreenState extends State<GardenScreen>
                     editProcedure(procedure);
                   } else {
                     confirmDelete(
-                      procedure.weekly
-                          ? 'Удалить еженедельную серию?'
+                      procedure.repeats
+                          ? 'Удалить серию повторений?'
                           : 'Удалить процедуру?',
-                      procedure.weekly
+                      procedure.repeats
                           ? 'Все повторения этой процедуры будут удалены. Выполненный уход останется в журнале.'
                           : '${procedure.type.label}: ${model.plantFor(procedure).name}, ${fullDate(procedure.date)}.',
                       () => model.deleteProcedure(procedure.id),

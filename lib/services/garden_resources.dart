@@ -22,6 +22,7 @@ class GardenResources {
       await garden.flush();
     } finally {
       garden.dispose();
+      garden.encyclopedia?.close();
       references?.dispose();
       await gardenRepository?.close();
       await referenceRepository?.close();

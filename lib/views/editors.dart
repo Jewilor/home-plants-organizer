@@ -217,6 +217,7 @@ class _ProcedureEditorState extends State<ProcedureEditor> {
   late CareType type;
   late DateTime date;
   bool weekly = false;
+  final interval = TextEditingController();
   String fertilizerId = '';
   String? error;
   @override
@@ -227,6 +228,13 @@ class _ProcedureEditorState extends State<ProcedureEditor> {
     date = widget.procedure?.date ?? widget.model.selectedDate;
     weekly = widget.procedure?.weekly ?? false;
     fertilizerId = widget.procedure?.fertilizerId ?? '';
+    interval.text = (widget.procedure?.intervalDays ?? 0).toString();
+  }
+
+  @override
+  void dispose() {
+    interval.dispose();
+    super.dispose();
   }
 
   void save() {
@@ -238,6 +246,7 @@ class _ProcedureEditorState extends State<ProcedureEditor> {
         date: date,
         weekly: weekly,
         fertilizerId: fertilizerId,
+        repeatEveryDays: weekly ? 0 : int.tryParse(interval.text) ?? -1,
       );
       Navigator.pop(context);
     } on ArgumentError catch (e) {
@@ -310,9 +319,23 @@ class _ProcedureEditorState extends State<ProcedureEditor> {
             const SizedBox(height: 12),
             WeeklyChoice(
               value: weekly,
-              onChanged: (v) => setState(() => weekly = v),
+              intervalDays: int.tryParse(interval.text) ?? 0,
+              onChanged: (v) => setState(() {
+                weekly = v;
+                interval.text = v ? '7' : '0';
+              }),
             ),
-            if (widget.procedure?.weekly ?? false)
+            TextField(
+              key: const ValueKey('procedure-interval'),
+              controller: interval,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Интервал повторения, дней',
+                helperText: '0 – одна дата; от 1 до 365 – повторение',
+              ),
+              onChanged: (v) => setState(() => weekly = int.tryParse(v) == 7),
+            ),
+            if (widget.procedure?.repeats ?? false)
               const Text('Изменения применяются ко всей серии повторений.'),
             if (widget.procedure?.isCompleted ?? false)
               const Padding(
@@ -349,8 +372,14 @@ class _ProcedureEditorState extends State<ProcedureEditor> {
 
 /// Переключатель повторения процедуры с интервалом семь календарных дней.
 class WeeklyChoice extends StatelessWidget {
-  const WeeklyChoice({super.key, required this.value, required this.onChanged});
+  const WeeklyChoice({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.intervalDays = 0,
+  });
   final bool value;
+  final int intervalDays;
   final ValueChanged<bool> onChanged;
   @override
   Widget build(BuildContext context) => Column(
@@ -366,6 +395,8 @@ class WeeklyChoice extends StatelessWidget {
       Text(
         value
             ? 'Повторять каждые 7 дней с выбранной даты'
+            : intervalDays > 0
+            ? 'Повторять каждые $intervalDays дней'
             : 'Процедура на одну дату',
         style: Theme.of(context).textTheme.bodySmall,
       ),

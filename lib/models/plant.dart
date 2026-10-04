@@ -75,6 +75,7 @@ class CareProcedure {
     this.completedOn,
     this.weekly = false,
     this.fertilizerId = '',
+    this.repeatEveryDays = 0,
   });
   final String id;
   final String plantId;
@@ -85,6 +86,13 @@ class CareProcedure {
   /// Повторять процедуру каждые семь календарных дней от даты начала.
   final bool weekly;
 
+  /// Произвольный интервал повторения; недельный режим сохраняет прежние записи.
+  final int repeatEveryDays;
+  int get intervalDays => weekly ? 7 : repeatEveryDays;
+  bool get repeats => intervalDays > 0;
+  String get repeatLabel =>
+      weekly ? 'Еженедельно' : 'Каждые $intervalDays дней';
+
   /// Тип удобрения для подкормки; пустая строка означает отсутствие выбора.
   final String fertilizerId;
 
@@ -92,8 +100,13 @@ class CareProcedure {
   bool occursOn(DateTime day) {
     final start = dateOnly(date);
     final target = dateOnly(day);
-    return sameDay(start, target) ||
-        (weekly && !target.isBefore(start) && start.weekday == target.weekday);
+    final difference = DateTime.utc(
+      target.year,
+      target.month,
+      target.day,
+    ).difference(DateTime.utc(start.year, start.month, start.day)).inDays;
+    return difference == 0 ||
+        (repeats && difference >= 0 && difference % intervalDays == 0);
   }
 
   /// Создаёт отображаемый экземпляр серии для конкретной даты.
@@ -103,6 +116,7 @@ class CareProcedure {
     date: dateOnly(day),
     type: type,
     weekly: weekly,
+    repeatEveryDays: repeatEveryDays,
     fertilizerId: fertilizerId,
     completedOn: completion,
   );
@@ -118,6 +132,7 @@ class CareProcedure {
     type: type,
     completedOn: value,
     weekly: weekly,
+    repeatEveryDays: repeatEveryDays,
     fertilizerId: fertilizerId,
   );
 }

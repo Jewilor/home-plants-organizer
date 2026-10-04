@@ -3,6 +3,7 @@ import '../services/botanical_repository.dart';
 import '../services/label_recognition_service.dart';
 import '../viewmodels/garden_view_model.dart';
 import '../viewmodels/label_scan_view_model.dart';
+import 'care_guide_screen.dart';
 
 /// Экран съёмки этикетки и подтверждения распознанного названия растения.
 class LabelScanScreen extends StatefulWidget {
@@ -49,8 +50,20 @@ class _LabelScanScreenState extends State<LabelScanScreen> {
 
   void save() {
     try {
-      widget.garden.savePlant(name: name.text, species: species.text);
-      Navigator.pop(context);
+      final id = widget.garden.savePlant(
+        name: name.text,
+        species: species.text,
+      );
+      if (widget.garden.encyclopedia != null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => CareGuideScreen(garden: widget.garden, plantId: id),
+          ),
+        );
+      } else {
+        Navigator.pop(context);
+      }
     } on ArgumentError catch (e) {
       setState(() => saveError = e.message.toString());
     }
@@ -149,7 +162,7 @@ class _LabelScanScreenState extends State<LabelScanScreen> {
               label: const Text('Добавить в мои растения'),
             ),
             const Text(
-              'Расписание ухода можно настроить в календаре после добавления.',
+              'После добавления можно получить регламент из энциклопедии и создать расписание ухода.',
             ),
           ],
         ),

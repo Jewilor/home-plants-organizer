@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
+import '../models/care_guide.dart';
+import '../models/reminder.dart';
 import '../models/plant.dart';
 import '../models/care_record.dart';
 import '../models/garden_snapshot.dart';
@@ -8,7 +11,7 @@ import 'garden_repository.dart';
 class SqliteGardenRepository implements GardenRepository {
   SqliteGardenRepository._(this.database);
   final Database database;
-  static const schemaVersion = 2;
+  static const schemaVersion = 3;
 
   /// Открывает базу и выполняет необходимые миграции схемы.
   static Future<SqliteGardenRepository> open({
@@ -23,9 +26,11 @@ class SqliteGardenRepository implements GardenRepository {
         onCreate: (db, version) async {
           await createVersionOne(db);
           if (version >= 2) await upgradeToVersionTwo(db);
+          if (version >= 3) await upgradeToVersionThree(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
           if (oldVersion < 2) await upgradeToVersionTwo(db);
+          if (oldVersion < 3) await upgradeToVersionThree(db);
         },
       ),
     );
@@ -79,6 +84,17 @@ class SqliteGardenRepository implements GardenRepository {
     );
   }
 
+  /// Добавляет сетевые регламенты и произвольный интервал без потери старых данных.
+  static Future<void> upgradeToVersionThree(Database db) async {
+    await db.execute(
+      'ALTER TABLE care_procedures ADD COLUMN repeat_every_days INTEGER NOT NULL DEFAULT 0 CHECK(repeat_every_days BETWEEN 0 AND 365)',
+    );
+    await db.execute('''CREATE TABLE care_guides (
+      plant_id TEXT PRIMARY KEY NOT NULL REFERENCES plants(id) ON DELETE CASCADE,
+      guide_json TEXT NOT NULL
+    )''');
+  }
+
   @override
   Future<GardenSnapshot?> load() => database.transaction((txn) async {
     final settings = await txn.query('settings');
@@ -93,6 +109,7 @@ class SqliteGardenRepository implements GardenRepository {
       orderBy: 'performed_on DESC, rowid',
     );
     final completed = await txn.query('procedure_completions');
+    final guides = await txn.query('care_guides');
     final completions = <String, Map<DateTime, DateTime>>{};
     for (final row in completed) {
       completions.putIfAbsent(
@@ -121,6 +138,7 @@ class SqliteGardenRepository implements GardenRepository {
           date: decodeDay(row['date'] as String),
           type: CareType.values.byName(row['type'] as String),
           weekly: row['weekly'] == 1,
+          repeatEveryDays: row['repeat_every_days'] as int,
           completedOn: row['completed_on'] == null
               ? null
               : decodeDay(row['completed_on'] as String),
@@ -138,6 +156,17 @@ class SqliteGardenRepository implements GardenRepository {
       ),
       completions: completions,
       sequence: int.parse(values['sequence'] ?? '0'),
+      careGuides: {
+        for (final row in guides)
+          row['plant_id'] as String: CareGuide.fromJson(
+            jsonDecode(row['guide_json'] as String) as Map<String, dynamic>,
+          ),
+      },
+      reminderPreferences: values['reminders'] == null
+          ? const ReminderPreferences()
+          : ReminderPreferences.fromJson(
+              jsonDecode(values['reminders']!) as Map<String, dynamic>,
+            ),
     );
   });
 
@@ -190,6 +219,7 @@ class SqliteGardenRepository implements GardenRepository {
               'date': encodeDay(p.date),
               'type': p.type.name,
               'weekly': p.weekly ? 1 : 0,
+              'repeat_every_days': p.repeatEveryDays,
               'completed_on': p.completedOn == null
                   ? null
                   : encodeDay(p.completedOn!),
@@ -206,6 +236,17 @@ class SqliteGardenRepository implements GardenRepository {
               'note': r.note,
             },
         ]);
+        await txn.delete('care_guides');
+        for (final entry in snapshot.careGuides.entries) {
+          await txn.insert('care_guides', {
+            'plant_id': entry.key,
+            'guide_json': jsonEncode(entry.value.toJson()),
+          });
+        }
+        await txn.insert('settings', {
+          'key': 'reminders',
+          'value': jsonEncode(snapshot.reminderPreferences.toJson()),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
         await txn.delete('procedure_completions');
         final batch = txn.batch();
         for (final series in snapshot.completions.entries) {

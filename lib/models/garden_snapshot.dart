@@ -1,5 +1,7 @@
 import 'plant.dart';
 import 'care_record.dart';
+import 'care_guide.dart';
+import 'reminder.dart';
 
 /// Согласованное состояние сада для сохранения и восстановления.
 /// Копии коллекций защищают ожидающую записи операцию от последующих изменений.
@@ -10,9 +12,12 @@ class GardenSnapshot {
     required Iterable<CareRecord> records,
     required Map<String, Map<DateTime, DateTime>> completions,
     required this.sequence,
+    Map<String, CareGuide> careGuides = const {},
+    this.reminderPreferences = const ReminderPreferences(),
   }) : plants = List.unmodifiable(plants),
        procedures = List.unmodifiable(procedures),
        records = List.unmodifiable(records),
+       careGuides = Map.unmodifiable(careGuides),
        completions = Map.unmodifiable({
          for (final entry in completions.entries)
            entry.key: Map<DateTime, DateTime>.unmodifiable(entry.value),
@@ -22,6 +27,8 @@ class GardenSnapshot {
   final List<CareRecord> records;
   final Map<String, Map<DateTime, DateTime>> completions;
   final int sequence;
+  final Map<String, CareGuide> careGuides;
+  final ReminderPreferences reminderPreferences;
 }
 
 /// Сохраняет календарную дату без часового пояса и времени суток.

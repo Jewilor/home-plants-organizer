@@ -301,7 +301,10 @@ void main() {
       expect(state.plants.single.careConditions, 'Рассеянный свет.');
       expect(state.plants.single.familyId, isEmpty);
       expect(state.sequence, 17);
-      expect(await repository.database.getVersion(), 2);
+      expect(
+        await repository.database.getVersion(),
+        SqliteGardenRepository.schemaVersion,
+      );
       expect(
         (await repository.database.rawQuery(
           'PRAGMA table_info(care_procedures)',
