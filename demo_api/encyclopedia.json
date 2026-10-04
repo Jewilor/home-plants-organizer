@@ -1,0 +1,71 @@
+{
+  "data": [
+    {
+      "species": "Monstera deliciosa",
+      "aliases": [
+        "Монстера",
+        "Monstera deliciosa"
+      ],
+      "light": "Яркий рассеянный свет без прямого полуденного солнца.",
+      "humidity": "Умеренная или повышенная влажность воздуха.",
+      "watering": "Проверять влажность почвы перед поливом. Интервал ниже задан для учебной демонстрации расписания.",
+      "wateringIntervalDays": 7,
+      "sourceName": "Учебная энциклопедия – демонстрационные данные",
+      "sourceUrl": "https://github.com/Jewilor/home-plants-organizer/tree/main/demo_api"
+    },
+    {
+      "species": "Ficus elastica",
+      "aliases": [
+        "Фикус",
+        "Ficus elastica"
+      ],
+      "light": "Яркий рассеянный или фильтрованный свет.",
+      "humidity": "Умеренная влажность воздуха; избегать чрезмерно сухого воздуха.",
+      "watering": "Проверять влажность почвы перед поливом. Интервал ниже задан для учебной демонстрации расписания.",
+      "wateringIntervalDays": 10,
+      "sourceName": "Учебная энциклопедия – демонстрационные данные",
+      "sourceUrl": "https://github.com/Jewilor/home-plants-organizer/tree/main/demo_api"
+    },
+    {
+      "species": "Spathiphyllum wallisii",
+      "aliases": [
+        "Спатифиллум",
+        "Spathiphyllum wallisii"
+      ],
+      "light": "Непрямой свет; защищать листья от прямого солнца.",
+      "humidity": "Умеренная влажность воздуха, постоянное тепло.",
+      "watering": "Проверять влажность почвы перед поливом. Интервал ниже задан для учебной демонстрации расписания.",
+      "wateringIntervalDays": 7,
+      "sourceName": "Учебная энциклопедия – демонстрационные данные",
+      "sourceUrl": "https://github.com/Jewilor/home-plants-organizer/tree/main/demo_api"
+    },
+    {
+      "species": "Dracaena trifasciata",
+      "aliases": [
+        "Сансевиерия",
+        "Dracaena trifasciata",
+        "Sansevieria trifasciata"
+      ],
+      "light": "Предпочитает яркое место; переносит лёгкую тень.",
+      "humidity": "Низкая влажность воздуха; дополнительное опрыскивание не требуется.",
+      "watering": "Проверять влажность почвы перед поливом. Интервал ниже задан для учебной демонстрации расписания.",
+      "wateringIntervalDays": 14,
+      "sourceName": "Учебная энциклопедия – демонстрационные данные",
+      "sourceUrl": "https://github.com/Jewilor/home-plants-organizer/tree/main/demo_api"
+    },
+    {
+      "species": "Aglaonema",
+      "aliases": [
+        "Аглаонема",
+        "Aglaonema",
+        "Aglaonema commutatum"
+      ],
+      "light": "Общие условия для рода Aglaonema: рассеянный или непрямой свет; переносит затенение.",
+      "humidity": "Предпочитает повышенную влажность воздуха, но переносит более сухой воздух.",
+      "watering": "Проверять влажность почвы перед поливом. Интервал ниже задан для учебной демонстрации расписания.",
+      "wateringIntervalDays": 7,
+      "sourceName": "Учебная энциклопедия – демонстрационные данные",
+      "sourceUrl": "https://github.com/Jewilor/home-plants-organizer/tree/main/demo_api"
+    }
+  ]
+}
