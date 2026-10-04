@@ -1,3 +1,5 @@
+import '../models/reference_entry.dart';
+import 'storage_notice.dart';
 import 'package:flutter/material.dart';
 import '../models/plant.dart';
 import '../services/botanical_repository.dart';
@@ -59,6 +61,10 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                     ),
                     if (plant.species.isNotEmpty) Text(plant.species),
                     if (plant.room.isNotEmpty) Text('Комната: ${plant.room}'),
+                    if (plant.familyId.isNotEmpty)
+                      Text(
+                        'Семейство: ${widget.garden.references?.find(ReferenceKind.family, plant.familyId)?.name ?? 'Запись недоступна'}',
+                      ),
                     const SizedBox(height: 24),
                     Text(
                       'Ботаническая справка',
@@ -132,6 +138,8 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                         ),
                       ),
                     const SizedBox(height: 24),
+                    StorageNotice(garden: widget.garden),
+                    const SizedBox(height: 12),
                     Text(
                       'Журнал ухода',
                       style: Theme.of(context).textTheme.titleLarge,
@@ -180,8 +188,10 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                         ),
                       ),
                     const SizedBox(height: 12),
-                    const Text(
-                      'История и расписание сохраняются до полного перезапуска приложения.',
+                    Text(
+                      widget.garden.persistent
+                          ? 'История и расписание восстанавливаются после повторного запуска приложения.'
+                          : 'История и расписание сохраняются до полного перезапуска приложения.',
                     ),
                   ],
                 ),

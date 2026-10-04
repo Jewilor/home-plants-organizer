@@ -1,3 +1,6 @@
+import 'reference_screen.dart';
+import '../models/reference_entry.dart';
+import 'storage_notice.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/plant.dart';
@@ -138,6 +141,18 @@ class _GardenScreenState extends State<GardenScreen>
           ],
         ),
         actions: [
+          if (model.references != null)
+            IconButton(
+              key: const ValueKey('reference-catalog'),
+              tooltip: 'Справочники',
+              icon: const Icon(Icons.menu_book_outlined),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => ReferenceScreen(model: model.references!),
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Text(
@@ -288,10 +303,7 @@ class _GardenScreenState extends State<GardenScreen>
           ),
         ),
       const SizedBox(height: 8),
-      const Text(
-        'Изменения хранятся до перезапуска приложения.',
-        style: TextStyle(fontSize: 12, color: muted),
-      ),
+      StorageNotice(garden: model),
     ],
   );
 
@@ -305,6 +317,8 @@ class _GardenScreenState extends State<GardenScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('Календарь ухода', style: heading),
+        const SizedBox(height: 8),
+        StorageNotice(garden: model),
         const SizedBox(height: 8),
         const Text(
           'Выберите день, чтобы увидеть процедуры',
@@ -512,7 +526,7 @@ class _GardenScreenState extends State<GardenScreen>
                 style: const TextStyle(fontWeight: FontWeight.w700, color: ink),
               ),
               subtitle: Text(
-                '${model.plantFor(procedure).name}${procedure.weekly ? '\nЕженедельно' : ''}${procedure.isCompleted ? '\nВыполнено ${fullDate(procedure.completedOn!)}' : ''}',
+                '${model.plantFor(procedure).name}${procedure.fertilizerId.isEmpty ? '' : '\nУдобрение: ${model.references?.find(ReferenceKind.fertilizer, procedure.fertilizerId)?.name ?? 'Запись недоступна'}'}${procedure.weekly ? '\nЕженедельно' : ''}${procedure.isCompleted ? '\nВыполнено ${fullDate(procedure.completedOn!)}' : ''}',
               ),
               trailing: PopupMenuButton<String>(
                 key: ValueKey('procedure-menu-${procedure.id}'),

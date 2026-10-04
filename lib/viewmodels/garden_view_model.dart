@@ -2,15 +2,35 @@ import 'package:flutter/foundation.dart';
 import '../data/demo_garden.dart';
 import '../models/plant.dart';
 import '../models/care_record.dart';
+import '../models/garden_snapshot.dart';
+import '../models/reference_entry.dart';
+import '../services/garden_repository.dart';
+import 'reference_view_model.dart';
 
-/// Управляет растениями, расписанием и историей ухода в оперативной памяти.
+/// Управляет садом и последовательно сохраняет его состояние в основной базе.
 /// Представления подписываются на изменения через [ChangeNotifier].
 class GardenViewModel extends ChangeNotifier {
-  GardenViewModel({DateTime Function()? clock, DemoGarden? garden})
-    : _clock = clock ?? DateTime.now {
+  GardenViewModel({
+    DateTime Function()? clock,
+    DemoGarden? garden,
+    this.repository,
+    this.references,
+    GardenSnapshot? snapshot,
+  }) : _clock = clock ?? DateTime.now {
     today = dateOnly(_clock());
     selectedDate = today;
     visibleMonth = DateTime(today.year, today.month);
+    if (snapshot != null) {
+      _plants = List.of(snapshot.plants);
+      _procedures = List.of(snapshot.procedures);
+      _records.addAll(snapshot.records);
+      for (final entry in snapshot.completions.entries) {
+        _completions[entry.key] = Map.of(entry.value);
+      }
+      _sequence = snapshot.sequence;
+      _watchReferences();
+      return;
+    }
     final source = garden ?? DemoGarden(today);
     _plants = List.of(source.plants);
     _procedures = [
@@ -36,7 +56,93 @@ class GardenViewModel extends ChangeNotifier {
         );
       }
     }
+    _watchReferences();
   }
+  final GardenRepository? repository;
+  final ReferenceViewModel? references;
+  Future<void> _writes = Future.value();
+  int _pendingWrites = 0;
+  bool _disposed = false;
+  String? storageError;
+  bool get saving => _pendingWrites > 0;
+  bool get persistent => repository != null;
+
+  /// Отделяет исходные записи от вычисляемых сроков полива.
+  GardenSnapshot get snapshot => GardenSnapshot(
+    plants: _plants,
+    procedures: _procedures,
+    records: _records,
+    completions: _completions,
+    sequence: _sequence,
+  );
+
+  void _watchReferences() {
+    references?.addListener(_referencesChanged);
+    references?.bindUsageCheck(isReferenceInUse);
+  }
+
+  void _referencesChanged() {
+    if (!_disposed) notifyListeners();
+  }
+
+  /// Проверяет ссылки и запрещает удаление справочника до подтверждения записи сада.
+  bool isReferenceInUse(ReferenceKind kind, String id) {
+    if (saving) throw ArgumentError('Дождитесь сохранения изменений сада.');
+    if (storageError != null) {
+      throw ArgumentError('Сначала повторите сохранение изменений сада.');
+    }
+    return kind == ReferenceKind.family
+        ? _plants.any((plant) => plant.familyId == id)
+        : _procedures.any((procedure) => procedure.fertilizerId == id);
+  }
+
+  /// Ставит неизменяемый снимок в очередь: поздняя запись не обгоняет раннюю.
+  void _saveChanged() {
+    if (repository == null) {
+      notifyListeners();
+      return;
+    }
+    final state = snapshot;
+    _pendingWrites++;
+    storageError = null;
+    notifyListeners();
+    _writes = _writes
+        .then((_) => repository!.save(state))
+        .then(
+          (_) {
+            storageError = null;
+          },
+          onError: (Object error, StackTrace stack) {
+            storageError =
+                'Не удалось сохранить изменения. Повторите сохранение.';
+          },
+        )
+        .whenComplete(() {
+          _pendingWrites--;
+          if (!_disposed) notifyListeners();
+        });
+  }
+
+  /// Ожидает подтверждения всех поставленных в очередь операций.
+  Future<void> flush() async {
+    await _writes;
+    if (storageError != null) throw StateError(storageError!);
+  }
+
+  /// Сохраняет текущее состояние, в том числе после устранимой ошибки хранилища.
+  Future<void> persist() {
+    _saveChanged();
+    return flush();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    references?.removeListener(_referencesChanged);
+    references?.bindUsageCheck(null);
+    super.dispose();
+  }
+
   final DateTime Function() _clock;
   late DateTime today;
   late DateTime selectedDate;
@@ -98,6 +204,7 @@ class GardenViewModel extends ChangeNotifier {
         species: plant.species,
         room: plant.room,
         careConditions: plant.careConditions,
+        familyId: plant.familyId,
         art: plant.art,
         nextWatering: pending.isEmpty ? null : pending.first,
         lastWateredOn: completed.isEmpty ? null : completed.last,
@@ -126,9 +233,18 @@ class GardenViewModel extends ChangeNotifier {
     String species = '',
     String room = '',
     String? careConditions,
+    String? familyId,
     DateTime? firstWatering,
     bool weekly = false,
   }) {
+    if (familyId != null &&
+        familyId.isNotEmpty &&
+        (references?.saving == true ||
+            references?.find(ReferenceKind.family, familyId) == null)) {
+      throw ArgumentError(
+        'Выберите существующее семейство и дождитесь сохранения справочника.',
+      );
+    }
     final clean = name.trim();
     if (clean.isEmpty) throw ArgumentError('Введите название растения.');
     if (clean.length > 80 ||
@@ -147,6 +263,7 @@ class GardenViewModel extends ChangeNotifier {
       careConditions:
           (careConditions ?? (index < 0 ? '' : _plants[index].careConditions))
               .trim(),
+      familyId: familyId ?? (index < 0 ? '' : _plants[index].familyId),
       art: index < 0 ? _sequence % 4 : _plants[index].art,
     );
     if (index < 0) {
@@ -165,7 +282,7 @@ class GardenViewModel extends ChangeNotifier {
     } else {
       _plants[index] = plant;
     }
-    notifyListeners();
+    _saveChanged();
     return plant.id;
   }
 
@@ -179,7 +296,7 @@ class GardenViewModel extends ChangeNotifier {
     _procedures.removeWhere((p) => p.plantId == id);
     _completions.removeWhere((key, _) => ids.contains(key));
     _records.removeWhere((r) => r.plantId == id);
-    notifyListeners();
+    _saveChanged();
   }
 
   bool _overlaps(CareProcedure a, CareProcedure b) {
@@ -197,9 +314,18 @@ class GardenViewModel extends ChangeNotifier {
     required DateTime date,
     required CareType type,
     bool weekly = false,
+    String fertilizerId = '',
   }) {
     if (!_plants.any((p) => p.id == plantId)) {
       throw ArgumentError('Выберите существующее растение.');
+    }
+    final fertilizer = type == CareType.feeding ? fertilizerId : '';
+    if (fertilizer.isNotEmpty &&
+        (references?.saving == true ||
+            references?.find(ReferenceKind.fertilizer, fertilizer) == null)) {
+      throw ArgumentError(
+        'Выберите существующий тип удобрения и дождитесь сохранения справочника.',
+      );
     }
     final index = id == null ? -1 : _procedures.indexWhere((p) => p.id == id);
     if (id != null && index < 0) throw ArgumentError('Процедура уже удалена.');
@@ -217,6 +343,7 @@ class GardenViewModel extends ChangeNotifier {
       date: day,
       type: type,
       weekly: weekly,
+      fertilizerId: fertilizer,
       completedOn: unchanged ? old.completedOn : null,
     );
     if (_procedures.any(
@@ -238,7 +365,7 @@ class GardenViewModel extends ChangeNotifier {
     }
     selectedDate = day;
     visibleMonth = DateTime(day.year, day.month);
-    notifyListeners();
+    _saveChanged();
     return p.id;
   }
 
@@ -246,7 +373,7 @@ class GardenViewModel extends ChangeNotifier {
   void deleteProcedure(String id) {
     _procedures.removeWhere((p) => p.id == id);
     _completions.remove(id);
-    notifyListeners();
+    _saveChanged();
   }
 
   void _markDue(String plantId, CareType type, DateTime performedOn) {
@@ -302,7 +429,7 @@ class GardenViewModel extends ChangeNotifier {
         note: note.trim(),
       ),
     );
-    notifyListeners();
+    _saveChanged();
   }
 
   /// Отмечает полив за текущий день либо отменяет отметки этого дня.
@@ -337,7 +464,7 @@ class GardenViewModel extends ChangeNotifier {
         _procedures[i] = p.withCompletion(null);
       }
     }
-    notifyListeners();
+    _saveChanged();
   }
 
   /// Выбирает календарный день и соответствующий месяц.

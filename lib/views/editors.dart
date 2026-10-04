@@ -1,3 +1,6 @@
+import '../viewmodels/reference_view_model.dart';
+import '../models/reference_entry.dart';
+import 'reference_screen.dart';
 import 'package:flutter/material.dart';
 import '../models/plant.dart';
 import '../viewmodels/garden_view_model.dart';
@@ -50,6 +53,7 @@ class _PlantEditorState extends State<PlantEditor> {
   late final TextEditingController room;
   late final TextEditingController careConditions;
   late DateTime date;
+  String familyId = '';
   bool schedule = true;
   bool weekly = false;
   String? error;
@@ -62,6 +66,7 @@ class _PlantEditorState extends State<PlantEditor> {
     careConditions = TextEditingController(
       text: widget.plant?.careConditions ?? '',
     );
+    familyId = widget.plant?.familyId ?? '';
     date = widget.model.today;
   }
 
@@ -83,6 +88,7 @@ class _PlantEditorState extends State<PlantEditor> {
         species: species.text,
         room: room.text,
         careConditions: careConditions.text,
+        familyId: familyId,
         firstWatering: widget.plant == null && schedule ? date : null,
         weekly: weekly,
       );
@@ -129,6 +135,16 @@ class _PlantEditorState extends State<PlantEditor> {
                 maxLength: 60,
                 decoration: const InputDecoration(labelText: 'Комната'),
               ),
+              if (widget.model.references != null) ...[
+                const SizedBox(height: 12),
+                ReferenceSelector(
+                  key: const ValueKey('plant-family'),
+                  model: widget.model.references!,
+                  kind: ReferenceKind.family,
+                  value: familyId,
+                  onChanged: (value) => setState(() => familyId = value),
+                ),
+              ],
               TextFormField(
                 key: const ValueKey('plant-care-conditions'),
                 controller: careConditions,
@@ -201,6 +217,7 @@ class _ProcedureEditorState extends State<ProcedureEditor> {
   late CareType type;
   late DateTime date;
   bool weekly = false;
+  String fertilizerId = '';
   String? error;
   @override
   void initState() {
@@ -209,6 +226,7 @@ class _ProcedureEditorState extends State<ProcedureEditor> {
     type = widget.procedure?.type ?? CareType.watering;
     date = widget.procedure?.date ?? widget.model.selectedDate;
     weekly = widget.procedure?.weekly ?? false;
+    fertilizerId = widget.procedure?.fertilizerId ?? '';
   }
 
   void save() {
@@ -219,6 +237,7 @@ class _ProcedureEditorState extends State<ProcedureEditor> {
         type: type,
         date: date,
         weekly: weekly,
+        fertilizerId: fertilizerId,
       );
       Navigator.pop(context);
     } on ArgumentError catch (e) {
@@ -271,6 +290,17 @@ class _ProcedureEditorState extends State<ProcedureEditor> {
               ],
               onChanged: (value) => setState(() => type = value!),
             ),
+            if (type == CareType.feeding &&
+                widget.model.references != null) ...[
+              const SizedBox(height: 16),
+              ReferenceSelector(
+                key: const ValueKey('procedure-fertilizer'),
+                model: widget.model.references!,
+                kind: ReferenceKind.fertilizer,
+                value: fertilizerId,
+                onChanged: (value) => setState(() => fertilizerId = value),
+              ),
+            ],
             const SizedBox(height: 20),
             const Text('Дата процедуры'),
             DateField(
@@ -340,5 +370,55 @@ class WeeklyChoice extends StatelessWidget {
         style: Theme.of(context).textTheme.bodySmall,
       ),
     ],
+  );
+}
+
+/// Выбор записи справочника по идентификатору с возможностью снять связь.
+class ReferenceSelector extends StatelessWidget {
+  const ReferenceSelector({
+    super.key,
+    required this.model,
+    required this.kind,
+    required this.value,
+    required this.onChanged,
+  });
+  final ReferenceViewModel model;
+  final ReferenceKind kind;
+  final String value;
+  final ValueChanged<String> onChanged;
+  @override
+  Widget build(BuildContext context) => DropdownButtonFormField<String>(
+    initialValue: value,
+    isExpanded: true,
+    decoration: InputDecoration(
+      labelText: kind == ReferenceKind.family
+          ? 'Семейство растения'
+          : 'Тип удобрения',
+    ),
+    items: [
+      const DropdownMenuItem(value: '', child: Text('Не выбрано')),
+      if (value.isNotEmpty && model.find(kind, value) == null)
+        DropdownMenuItem(value: value, child: const Text('Запись недоступна')),
+      for (final entry in model.entries(kind))
+        DropdownMenuItem(
+          value: entry.id,
+          child: Row(
+            children: [
+              Icon(referenceIcon(entry.icon), size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  entry.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+    ],
+    onChanged: (value) {
+      if (value != null) onChanged(value);
+    },
   );
 }

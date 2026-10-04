@@ -31,6 +31,7 @@ class Plant {
     required this.species,
     required this.room,
     this.careConditions = '',
+    this.familyId = '',
     this.nextWatering,
     this.lastWateredOn,
     required this.art,
@@ -42,6 +43,9 @@ class Plant {
 
   /// Условия содержания, введённые пользователем для конкретного растения.
   final String careConditions;
+
+  /// Идентификатор семейства из вспомогательного справочника.
+  final String familyId;
   // These dates are derived by the ViewModel from the procedures.
   final DateTime? nextWatering;
   final DateTime? lastWateredOn;
@@ -70,6 +74,7 @@ class CareProcedure {
     required this.type,
     this.completedOn,
     this.weekly = false,
+    this.fertilizerId = '',
   });
   final String id;
   final String plantId;
@@ -79,6 +84,9 @@ class CareProcedure {
 
   /// Повторять процедуру каждые семь календарных дней от даты начала.
   final bool weekly;
+
+  /// Тип удобрения для подкормки; пустая строка означает отсутствие выбора.
+  final String fertilizerId;
 
   /// Проверяет, относится ли день к однократной процедуре или недельной серии.
   bool occursOn(DateTime day) {
@@ -95,6 +103,7 @@ class CareProcedure {
     date: dateOnly(day),
     type: type,
     weekly: weekly,
+    fertilizerId: fertilizerId,
     completedOn: completion,
   );
 
@@ -109,5 +118,6 @@ class CareProcedure {
     type: type,
     completedOn: value,
     weekly: weekly,
+    fertilizerId: fertilizerId,
   );
 }
