@@ -324,9 +324,19 @@ void main() {
     await tester.tap(find.byIcon(Icons.keyboard_outlined));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).at(0), '18');
+    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).at(1), '30');
+    await tester.pumpAndSettle();
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
+    expect(find.byType(TimePickerDialog), findsNothing);
+    expect(
+      garden.customWateringTimeFor(id),
+      isNotNull,
+      reason:
+          'The accepted picker time must be saved. Visible text: '
+          '${tester.widgetList<Text>(find.byType(Text)).map((t) => t.data).join("; ")}',
+    );
     expect(garden.customWateringTimeFor(id)!.hour, 18);
     expect(garden.customWateringTimeFor(id)!.minute, 30);
     final reset = find.byKey(ValueKey('reset-watering-time-$id'));
