@@ -36,6 +36,7 @@ class GardenViewModel extends ChangeNotifier {
       _sequence = snapshot.sequence;
       _careGuides.addAll(snapshot.careGuides);
       _reminderPreferences = snapshot.reminderPreferences;
+      _wateringReminderTimes.addAll(snapshot.wateringReminderTimes);
       _watchReferences();
       return;
     }
@@ -71,6 +72,7 @@ class GardenViewModel extends ChangeNotifier {
   final PlantEncyclopedia? encyclopedia;
   final ReminderService? reminderService;
   final Map<String, CareGuide> _careGuides = {};
+  final Map<String, ReminderTime> _wateringReminderTimes = {};
   ReminderPreferences _reminderPreferences = const ReminderPreferences();
   List<CareReminder> _scheduledReminders = [];
   String? notificationIssue;
@@ -78,6 +80,16 @@ class GardenViewModel extends ChangeNotifier {
   List<CareReminder> get scheduledReminders =>
       List.unmodifiable(_scheduledReminders);
   CareGuide? careGuideFor(String plantId) => _careGuides[plantId];
+
+  /// Собственное время растения; отсутствие записи означает использование общего.
+  ReminderTime? customWateringTimeFor(String plantId) =>
+      _wateringReminderTimes[plantId];
+
+  /// Время полива с учётом выбранного общего или отдельного режима.
+  ReminderTime wateringTimeFor(String plantId) =>
+      _reminderPreferences.individualWateringTimes
+      ? _wateringReminderTimes[plantId] ?? _reminderPreferences.commonTime
+      : _reminderPreferences.commonTime;
   Future<void> _writes = Future.value();
   int _pendingWrites = 0;
   bool _disposed = false;
@@ -94,6 +106,7 @@ class GardenViewModel extends ChangeNotifier {
     sequence: _sequence,
     careGuides: _careGuides,
     reminderPreferences: _reminderPreferences,
+    wateringReminderTimes: _wateringReminderTimes,
   );
 
   void _watchReferences() {
@@ -320,6 +333,7 @@ class GardenViewModel extends ChangeNotifier {
     _completions.removeWhere((key, _) => ids.contains(key));
     _records.removeWhere((r) => r.plantId == id);
     _careGuides.remove(id);
+    _wateringReminderTimes.remove(id);
     _saveChanged();
   }
 
@@ -597,10 +611,44 @@ class GardenViewModel extends ChangeNotifier {
       enabled: enabled,
       hour: h,
       minute: m,
+      individualWateringTimes: _reminderPreferences.individualWateringTimes,
     );
     _saveChanged();
     await flush();
     return true;
+  }
+
+  /// Выбирает общее время полива либо сохранённые отдельные часы растений.
+  /// При переходе к общему режиму отдельные часы сохраняются для возврата к ним.
+  Future<void> configureWateringReminders({required bool individual}) async {
+    _reminderPreferences = ReminderPreferences(
+      enabled: _reminderPreferences.enabled,
+      hour: _reminderPreferences.hour,
+      minute: _reminderPreferences.minute,
+      individualWateringTimes: individual,
+    );
+    _saveChanged();
+    await flush();
+  }
+
+  /// Сохраняет время полива одного растения; null возвращает его к общему времени.
+  Future<void> setWateringReminderTime(
+    String plantId,
+    ReminderTime? time,
+  ) async {
+    if (!_plants.any((plant) => plant.id == plantId)) {
+      throw ArgumentError('Растение уже удалено.');
+    }
+    if (time != null && !time.isValid) {
+      throw ArgumentError('Некорректное время.');
+    }
+    if (time == null) {
+      _wateringReminderTimes.remove(plantId);
+    } else {
+      _wateringReminderTimes[plantId] = time;
+    }
+    _saveChanged();
+    await flush();
   }
 
   /// Отправляет настоящее системное уведомление для самостоятельной проверки.

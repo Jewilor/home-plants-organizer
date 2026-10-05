@@ -13,11 +13,13 @@ class GardenSnapshot {
     required Map<String, Map<DateTime, DateTime>> completions,
     required this.sequence,
     Map<String, CareGuide> careGuides = const {},
+    Map<String, ReminderTime> wateringReminderTimes = const {},
     this.reminderPreferences = const ReminderPreferences(),
   }) : plants = List.unmodifiable(plants),
        procedures = List.unmodifiable(procedures),
        records = List.unmodifiable(records),
        careGuides = Map.unmodifiable(careGuides),
+       wateringReminderTimes = Map.unmodifiable(wateringReminderTimes),
        completions = Map.unmodifiable({
          for (final entry in completions.entries)
            entry.key: Map<DateTime, DateTime>.unmodifiable(entry.value),
@@ -29,6 +31,7 @@ class GardenSnapshot {
   final int sequence;
   final Map<String, CareGuide> careGuides;
   final ReminderPreferences reminderPreferences;
+  final Map<String, ReminderTime> wateringReminderTimes;
 }
 
 /// Сохраняет календарную дату без часового пояса и времени суток.

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import '../models/reminder.dart';
 import '../viewmodels/garden_view_model.dart';
 import 'editors.dart';
 
-/// Настройка локальных напоминаний и просмотр реально зарегистрированной очереди.
+/// Настройка общего или отдельного времени полива и системной очереди уведомлений.
 class RemindersScreen extends StatefulWidget {
   const RemindersScreen({super.key, required this.garden});
   final GardenViewModel garden;
@@ -15,6 +16,8 @@ class _RemindersScreenState extends State<RemindersScreen> {
   String? error;
   String time(int h, int m) =>
       '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+
+  /// Показывает состояние выполнения и сообщение об ошибке настройки.
   Future<void> run(Future<void> Function() action) async {
     if (busy) return;
     setState(() {
@@ -34,6 +37,26 @@ class _RemindersScreenState extends State<RemindersScreen> {
     }
   }
 
+  /// Выбирает часы и минуты и передаёт их общей либо отдельной настройке.
+  Future<void> chooseTime(
+    ReminderTime initial,
+    Future<void> Function(ReminderTime) save,
+  ) async {
+    final value = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: initial.hour, minute: initial.minute),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+        child: child!,
+      ),
+    );
+    if (value != null && mounted) {
+      await run(
+        () => save(ReminderTime(hour: value.hour, minute: value.minute)),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: widget.garden,
@@ -41,6 +64,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
       final garden = widget.garden;
       final prefs = garden.reminderPreferences;
       final supported = garden.reminderService != null;
+      final editable = supported && !busy && !garden.saving;
       return Scaffold(
         appBar: AppBar(title: const Text('Напоминания')),
         body: SingleChildScrollView(
@@ -61,7 +85,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Напоминать об уходе'),
                 value: prefs.enabled,
-                onChanged: !supported || busy || garden.saving
+                onChanged: !editable
                     ? null
                     : (v) => run(() async {
                         await garden.configureReminders(enabled: v);
@@ -69,28 +93,118 @@ class _RemindersScreenState extends State<RemindersScreen> {
               ),
               OutlinedButton.icon(
                 key: const ValueKey('reminder-time'),
-                onPressed: !supported || busy
+                onPressed: !editable
                     ? null
-                    : () async {
-                        final value = await showTimePicker(
-                          context: context,
-                          initialTime: TimeOfDay(
-                            hour: prefs.hour,
-                            minute: prefs.minute,
-                          ),
+                    : () => chooseTime(prefs.commonTime, (value) async {
+                        await garden.configureReminders(
+                          enabled: garden.reminderPreferences.enabled,
+                          hour: value.hour,
+                          minute: value.minute,
                         );
-                        if (value != null && mounted) {
-                          await run(() async {
-                            await garden.configureReminders(
-                              enabled: prefs.enabled,
-                              hour: value.hour,
-                              minute: value.minute,
-                            );
-                          });
-                        }
-                      },
+                      }),
                 icon: const Icon(Icons.schedule),
-                label: Text('Время: ${time(prefs.hour, prefs.minute)}'),
+                label: Text('Общее время: ${time(prefs.hour, prefs.minute)}'),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Время полива',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              SwitchListTile(
+                key: const ValueKey('individual-watering-times'),
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Отдельно для каждого растения'),
+                subtitle: Text(
+                  prefs.individualWateringTimes
+                      ? 'Задайте своё время. Без отдельной настройки используется общее.'
+                      : 'Все растения используют общее время: ${time(prefs.hour, prefs.minute)}.',
+                ),
+                value: prefs.individualWateringTimes,
+                onChanged: !editable
+                    ? null
+                    : (value) => run(
+                        () => garden.configureWateringReminders(
+                          individual: value,
+                        ),
+                      ),
+              ),
+              if (prefs.individualWateringTimes) ...[
+                if (garden.plants.isEmpty)
+                  const Text(
+                    'Добавьте растение, чтобы выбрать для него время полива.',
+                  ),
+                for (final plant in garden.plants)
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            plant.name,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          Text(
+                            garden.customWateringTimeFor(plant.id) == null
+                                ? 'Используется общее время'
+                                : 'Своё время полива',
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: [
+                              OutlinedButton.icon(
+                                key: ValueKey(
+                                  'watering-reminder-time-${plant.id}',
+                                ),
+                                onPressed: !editable
+                                    ? null
+                                    : () => chooseTime(
+                                        garden.wateringTimeFor(plant.id),
+                                        (value) =>
+                                            garden.setWateringReminderTime(
+                                              plant.id,
+                                              value,
+                                            ),
+                                      ),
+                                icon: const Icon(Icons.schedule),
+                                label: Text(
+                                  time(
+                                    garden.wateringTimeFor(plant.id).hour,
+                                    garden.wateringTimeFor(plant.id).minute,
+                                  ),
+                                ),
+                              ),
+                              if (garden.customWateringTimeFor(plant.id) !=
+                                  null)
+                                TextButton(
+                                  key: ValueKey(
+                                    'reset-watering-time-${plant.id}',
+                                  ),
+                                  onPressed: !editable
+                                      ? null
+                                      : () => run(
+                                          () => garden.setWateringReminderTime(
+                                            plant.id,
+                                            null,
+                                          ),
+                                        ),
+                                  child: const Text('Использовать общее время'),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                const Text(
+                  'Отдельные часы сохраняются при переключении к общему времени.',
+                ),
+              ],
+              const SizedBox(height: 12),
+              const Text(
+                'Даты и интервалы полива задаются в календаре. Подкормка и пересадка используют общее время.',
               ),
               const Text(
                 'Время указано в часовом поясе устройства. Android может отложить уведомление в режиме энергосбережения.',
@@ -110,14 +224,14 @@ class _RemindersScreenState extends State<RemindersScreen> {
                 ),
               OutlinedButton(
                 key: const ValueKey('refresh-reminders'),
-                onPressed: !supported || busy
+                onPressed: !editable
                     ? null
                     : () => run(garden.refreshReminders),
                 child: const Text('Обновить напоминания'),
               ),
               OutlinedButton(
                 key: const ValueKey('test-notification'),
-                onPressed: !supported || busy
+                onPressed: !editable
                     ? null
                     : () => run(() async {
                         await garden.testNotification();

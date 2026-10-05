@@ -110,6 +110,10 @@ class SqliteGardenRepository implements GardenRepository {
     );
     final completed = await txn.query('procedure_completions');
     final guides = await txn.query('care_guides');
+    final wateringTimes = values['watering_reminder_times'] == null
+        ? <String, dynamic>{}
+        : jsonDecode(values['watering_reminder_times']!)
+              as Map<String, dynamic>;
     final completions = <String, Map<DateTime, DateTime>>{};
     for (final row in completed) {
       completions.putIfAbsent(
@@ -161,6 +165,10 @@ class SqliteGardenRepository implements GardenRepository {
           row['plant_id'] as String: CareGuide.fromJson(
             jsonDecode(row['guide_json'] as String) as Map<String, dynamic>,
           ),
+      },
+      wateringReminderTimes: {
+        for (final entry in wateringTimes.entries)
+          entry.key: ReminderTime.fromJson(entry.value as Map<String, dynamic>),
       },
       reminderPreferences: values['reminders'] == null
           ? const ReminderPreferences()
@@ -246,6 +254,13 @@ class SqliteGardenRepository implements GardenRepository {
         await txn.insert('settings', {
           'key': 'reminders',
           'value': jsonEncode(snapshot.reminderPreferences.toJson()),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+        await txn.insert('settings', {
+          'key': 'watering_reminder_times',
+          'value': jsonEncode({
+            for (final entry in snapshot.wateringReminderTimes.entries)
+              entry.key: entry.value.toJson(),
+          }),
         }, conflictAlgorithm: ConflictAlgorithm.replace);
         await txn.delete('procedure_completions');
         final batch = txn.batch();
