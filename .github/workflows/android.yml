@@ -39,7 +39,7 @@ jobs:
           result=$?
           cat test-results.log
           if [ "$result" -ne 0 ]; then
-            python3 -c 'from pathlib import Path; t="\n".join(Path("test-results.log").read_text().splitlines()[-180:]); print("::error title=Flutter tests::"+t.replace("%","%25").replace("\r","%0D").replace("\n","%0A"))'
+            python3 -c 'from pathlib import Path; lines=Path("test-results.log").read_text().splitlines(); indices=[i for i,s in enumerate(lines) if any(x in s for x in ("[E]", "EXCEPTION CAUGHT", "Expected:", "Error:"))]; t="\n".join(lines[max(0,indices[0]-1):indices[0]+38] if indices else lines[-25:])[:3500]; print("::error title=Flutter tests::"+t.replace("%","%25").replace("\r","%0D").replace("\n","%0A"))'
           fi
           exit "$result"
       - name: Build debug APK
