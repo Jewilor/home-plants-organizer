@@ -117,7 +117,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                 subtitle: Text(
                   prefs.individualWateringTimes
                       ? 'Задайте своё время. Без отдельной настройки используется общее.'
-                      : 'Все растения используют общее время: ${time(prefs.hour, prefs.minute)}.',
+                      : 'Процедуры без отдельных часов используют общее время: ${time(prefs.hour, prefs.minute)}.',
                 ),
                 value: prefs.individualWateringTimes,
                 onChanged: !editable

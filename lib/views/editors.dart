@@ -92,9 +92,9 @@ class _PlantEditorState extends State<PlantEditor> {
         careConditions: careConditions.text,
         familyId: familyId,
         firstWatering: widget.plant == null && schedule ? date : null,
-        repeatEveryDays: careSchedule.repeatEveryDays,
-        weekdays: careSchedule.selectedWeekdays,
-        times: careSchedule.selectedTimes,
+        repeatEveryDays: schedule ? careSchedule.repeatEveryDays : 0,
+        weekdays: schedule ? careSchedule.selectedWeekdays : const [],
+        times: schedule ? careSchedule.selectedTimes : const [],
       );
       Navigator.pop(context);
     } on ArgumentError catch (e) {
