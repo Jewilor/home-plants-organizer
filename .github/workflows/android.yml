@@ -33,7 +33,15 @@ jobs:
       - name: Analyze
         run: flutter analyze
       - name: Test
-        run: flutter test
+        run: |
+          set +e
+          flutter test --reporter expanded > test-results.log 2>&1
+          result=$?
+          cat test-results.log
+          if [ "$result" -ne 0 ]; then
+            python3 -c 'from pathlib import Path; t="\n".join(Path("test-results.log").read_text().splitlines()[-180:]); print("::error title=Flutter tests::"+t.replace("%","%25").replace("\r","%0D").replace("\n","%0A"))'
+          fi
+          exit "$result"
       - name: Build debug APK
         run: flutter build apk --debug -t lib/main.dart
       - name: Save APK
