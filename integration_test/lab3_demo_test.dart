@@ -152,7 +152,16 @@ void main() {
         'Рассеянный свет. Повышенная влажность воздуха.',
       );
       await hideKeyboard();
-      await tap(find.byKey(const ValueKey('weekly-choice')));
+      await tap(find.byKey(const ValueKey('schedule-mode')));
+      await tap(find.text('Через заданное число дней').last);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('procedure-interval')),
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('procedure-interval')),
+        '7',
+      );
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.drag(
         find
             .descendant(
@@ -181,7 +190,16 @@ void main() {
       await select('procedure-plant', 'Учебная аглаонема · Гостиная');
       await select('procedure-type', 'Подкормка');
       await select('procedure-fertilizer', 'Комплексное');
-      await tap(find.byKey(const ValueKey('weekly-choice')));
+      await tap(find.byKey(const ValueKey('schedule-mode')));
+      await tap(find.text('Через заданное число дней').last);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('procedure-interval')),
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('procedure-interval')),
+        '7',
+      );
+      await tester.pump(const Duration(milliseconds: 500));
       await shot('05_procedure_editor');
       await tap(find.byKey(const ValueKey('save-procedure')));
       await garden.flush();
@@ -280,7 +298,6 @@ void main() {
       await shot('10_reference_deleted');
       await tester.pumpWidget(const SizedBox.shrink());
       await resources.close();
-
     },
   );
 }

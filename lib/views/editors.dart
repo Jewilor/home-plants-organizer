@@ -1,3 +1,4 @@
+import 'care_schedule_fields.dart';
 import '../viewmodels/reference_view_model.dart';
 import '../models/reference_entry.dart';
 import 'reference_screen.dart';
@@ -55,7 +56,7 @@ class _PlantEditorState extends State<PlantEditor> {
   late DateTime date;
   String familyId = '';
   bool schedule = true;
-  bool weekly = false;
+  final careSchedule = CareScheduleDraft();
   String? error;
   @override
   void initState() {
@@ -82,6 +83,7 @@ class _PlantEditorState extends State<PlantEditor> {
   void save() {
     if (!form.currentState!.validate()) return;
     try {
+      if (widget.plant == null && schedule) careSchedule.validate();
       widget.model.savePlant(
         id: widget.plant?.id,
         name: name.text,
@@ -90,7 +92,9 @@ class _PlantEditorState extends State<PlantEditor> {
         careConditions: careConditions.text,
         familyId: familyId,
         firstWatering: widget.plant == null && schedule ? date : null,
-        weekly: weekly,
+        repeatEveryDays: careSchedule.repeatEveryDays,
+        weekdays: careSchedule.selectedWeekdays,
+        times: careSchedule.selectedTimes,
       );
       Navigator.pop(context);
     } on ArgumentError catch (e) {
@@ -165,16 +169,15 @@ class _PlantEditorState extends State<PlantEditor> {
                   title: const Text('Запланировать первый полив'),
                   onChanged: (value) => setState(() => schedule = value!),
                 ),
-                if (schedule)
-                  WeeklyChoice(
-                    value: weekly,
-                    onChanged: (v) => setState(() => weekly = v),
-                  ),
-                if (schedule)
+                if (schedule) ...[
+                  const Text('Дата начала расписания'),
                   DateField(
                     date: date,
                     onChanged: (value) => setState(() => date = value),
                   ),
+                  const SizedBox(height: 12),
+                  CareScheduleFields(draft: careSchedule, startDate: date),
+                ],
               ] else
                 const Text(
                   'Даты и процедуры ухода можно изменить в календаре.',
@@ -216,8 +219,7 @@ class _ProcedureEditorState extends State<ProcedureEditor> {
   late String plantId;
   late CareType type;
   late DateTime date;
-  bool weekly = false;
-  final interval = TextEditingController();
+  late final CareScheduleDraft careSchedule;
   String fertilizerId = '';
   String? error;
   @override
@@ -226,27 +228,22 @@ class _ProcedureEditorState extends State<ProcedureEditor> {
     plantId = widget.procedure?.plantId ?? widget.model.plants.first.id;
     type = widget.procedure?.type ?? CareType.watering;
     date = widget.procedure?.date ?? widget.model.selectedDate;
-    weekly = widget.procedure?.weekly ?? false;
+    careSchedule = CareScheduleDraft(widget.procedure);
     fertilizerId = widget.procedure?.fertilizerId ?? '';
-    interval.text = (widget.procedure?.intervalDays ?? 0).toString();
-  }
-
-  @override
-  void dispose() {
-    interval.dispose();
-    super.dispose();
   }
 
   void save() {
     try {
+      careSchedule.validate();
       widget.model.saveProcedure(
         id: widget.procedure?.id,
         plantId: plantId,
         type: type,
         date: date,
-        weekly: weekly,
         fertilizerId: fertilizerId,
-        repeatEveryDays: weekly ? 0 : int.tryParse(interval.text) ?? -1,
+        repeatEveryDays: careSchedule.repeatEveryDays,
+        weekdays: careSchedule.selectedWeekdays,
+        times: careSchedule.selectedTimes,
       );
       Navigator.pop(context);
     } on ArgumentError catch (e) {
@@ -311,29 +308,18 @@ class _ProcedureEditorState extends State<ProcedureEditor> {
               ),
             ],
             const SizedBox(height: 20),
-            const Text('Дата процедуры'),
+            const Text('Дата начала расписания'),
             DateField(
               date: date,
               onChanged: (value) => setState(() => date = value),
             ),
             const SizedBox(height: 12),
-            WeeklyChoice(
-              value: weekly,
-              intervalDays: int.tryParse(interval.text) ?? 0,
-              onChanged: (v) => setState(() {
-                weekly = v;
-                interval.text = v ? '7' : '0';
-              }),
-            ),
-            TextField(
-              key: const ValueKey('procedure-interval'),
-              controller: interval,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Интервал повторения, дней',
-                helperText: '0 – одна дата; от 1 до 365 – повторение',
-              ),
-              onChanged: (v) => setState(() => weekly = int.tryParse(v) == 7),
+            CareScheduleFields(
+              draft: careSchedule,
+              startDate: date,
+              defaultMinutes:
+                  widget.model.wateringTimeFor(plantId).hour * 60 +
+                  widget.model.wateringTimeFor(plantId).minute,
             ),
             if (widget.procedure?.repeats ?? false)
               const Text('Изменения применяются ко всей серии повторений.'),
@@ -365,40 +351,6 @@ class _ProcedureEditorState extends State<ProcedureEditor> {
         key: const ValueKey('save-procedure'),
         onPressed: save,
         child: const Text('Сохранить'),
-      ),
-    ],
-  );
-}
-
-/// Переключатель повторения процедуры с интервалом семь календарных дней.
-class WeeklyChoice extends StatelessWidget {
-  const WeeklyChoice({
-    super.key,
-    required this.value,
-    required this.onChanged,
-    this.intervalDays = 0,
-  });
-  final bool value;
-  final int intervalDays;
-  final ValueChanged<bool> onChanged;
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      FilterChip(
-        key: const ValueKey('weekly-choice'),
-        label: const Text('Еженедельно'),
-        avatar: const Icon(Icons.repeat, size: 18),
-        selected: value,
-        onSelected: onChanged,
-      ),
-      Text(
-        value
-            ? 'Повторять каждые 7 дней с выбранной даты'
-            : intervalDays > 0
-            ? 'Повторять каждые $intervalDays дней'
-            : 'Процедура на одну дату',
-        style: Theme.of(context).textTheme.bodySmall,
       ),
     ],
   );

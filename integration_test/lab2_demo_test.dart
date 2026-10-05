@@ -64,7 +64,16 @@ void main() {
     debugPrint('SCENARIO: weekly editor');
     await tap(find.text('Календарь'));
     await tap(find.byKey(const ValueKey('add-procedure')));
-    await tap(find.byKey(const ValueKey('weekly-choice')));
+    await tap(find.byKey(const ValueKey('schedule-mode')));
+    await tap(find.text('Через заданное число дней').last);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('procedure-interval')),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('procedure-interval')),
+      '7',
+    );
+    await tester.pump(const Duration(milliseconds: 500));
     await shot('01_weekly_editor');
     await tap(find.byKey(const ValueKey('save-procedure')));
     await tap(find.byTooltip('Следующий месяц'));
@@ -72,7 +81,10 @@ void main() {
       find.byKey(ValueKey('day-${DateTime(2026, 10, 7).toIso8601String()}')),
     );
     expect(
-      model.proceduresOn(DateTime(2026, 10, 7)).where((p) => p.weekly).length,
+      model
+          .proceduresOn(DateTime(2026, 10, 7))
+          .where((p) => p.intervalDays == 7)
+          .length,
       1,
     );
     await shot('02_weekly_calendar');

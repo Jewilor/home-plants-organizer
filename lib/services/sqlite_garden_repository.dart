@@ -11,7 +11,7 @@ import 'garden_repository.dart';
 class SqliteGardenRepository implements GardenRepository {
   SqliteGardenRepository._(this.database);
   final Database database;
-  static const schemaVersion = 3;
+  static const schemaVersion = 4;
 
   /// Открывает базу и выполняет необходимые миграции схемы.
   static Future<SqliteGardenRepository> open({
@@ -27,10 +27,12 @@ class SqliteGardenRepository implements GardenRepository {
           await createVersionOne(db);
           if (version >= 2) await upgradeToVersionTwo(db);
           if (version >= 3) await upgradeToVersionThree(db);
+          if (version >= 4) await upgradeToVersionFour(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
           if (oldVersion < 2) await upgradeToVersionTwo(db);
           if (oldVersion < 3) await upgradeToVersionThree(db);
+          if (oldVersion < 4) await upgradeToVersionFour(db);
         },
       ),
     );
@@ -95,6 +97,20 @@ class SqliteGardenRepository implements GardenRepository {
     )''');
   }
 
+  /// Дополняет прежние процедуры днями недели и временем без удаления записей.
+  static Future<void> upgradeToVersionFour(Database db) async {
+    await db.execute(
+      "ALTER TABLE care_procedures ADD COLUMN weekdays TEXT NOT NULL DEFAULT '[]'",
+    );
+    await db.execute(
+      "ALTER TABLE care_procedures ADD COLUMN times TEXT NOT NULL DEFAULT '[]'",
+    );
+    await db.execute(
+      "ALTER TABLE care_records ADD COLUMN procedure_id TEXT NOT NULL DEFAULT ''",
+    );
+    await db.execute('ALTER TABLE care_records ADD COLUMN scheduled_for TEXT');
+  }
+
   @override
   Future<GardenSnapshot?> load() => database.transaction((txn) async {
     final settings = await txn.query('settings');
@@ -119,7 +135,7 @@ class SqliteGardenRepository implements GardenRepository {
       completions.putIfAbsent(
         row['procedure_id'] as String,
         () => {},
-      )[decodeDay(row['occurrence_date'] as String)] = decodeDay(
+      )[DateTime.parse(row['occurrence_date'] as String)] = DateTime.parse(
         row['performed_on'] as String,
       );
     }
@@ -143,6 +159,12 @@ class SqliteGardenRepository implements GardenRepository {
           type: CareType.values.byName(row['type'] as String),
           weekly: row['weekly'] == 1,
           repeatEveryDays: row['repeat_every_days'] as int,
+          weekdays: List<int>.unmodifiable(
+            (jsonDecode(row['weekdays'] as String) as List).cast<int>(),
+          ),
+          times: List<int>.unmodifiable(
+            (jsonDecode(row['times'] as String) as List).cast<int>(),
+          ),
           completedOn: row['completed_on'] == null
               ? null
               : decodeDay(row['completed_on'] as String),
@@ -154,7 +176,11 @@ class SqliteGardenRepository implements GardenRepository {
           id: row['id'] as String,
           plantId: row['plant_id'] as String,
           type: CareType.values.byName(row['type'] as String),
-          performedOn: decodeDay(row['performed_on'] as String),
+          performedOn: DateTime.parse(row['performed_on'] as String),
+          procedureId: row['procedure_id'] as String,
+          scheduledFor: row['scheduled_for'] == null
+              ? null
+              : DateTime.parse(row['scheduled_for'] as String),
           note: row['note'] as String,
         ),
       ),
@@ -228,6 +254,8 @@ class SqliteGardenRepository implements GardenRepository {
               'type': p.type.name,
               'weekly': p.weekly ? 1 : 0,
               'repeat_every_days': p.repeatEveryDays,
+              'weekdays': jsonEncode(p.weekdays),
+              'times': jsonEncode(p.times),
               'completed_on': p.completedOn == null
                   ? null
                   : encodeDay(p.completedOn!),
@@ -240,7 +268,9 @@ class SqliteGardenRepository implements GardenRepository {
               'id': r.id,
               'plant_id': r.plantId,
               'type': r.type.name,
-              'performed_on': encodeDay(r.performedOn),
+              'performed_on': r.performedOn.toIso8601String(),
+              'procedure_id': r.procedureId,
+              'scheduled_for': r.scheduledFor?.toIso8601String(),
               'note': r.note,
             },
         ]);
@@ -268,8 +298,8 @@ class SqliteGardenRepository implements GardenRepository {
           for (final occurrence in series.value.entries) {
             batch.insert('procedure_completions', {
               'procedure_id': series.key,
-              'occurrence_date': encodeDay(occurrence.key),
-              'performed_on': encodeDay(occurrence.value),
+              'occurrence_date': occurrence.key.toIso8601String(),
+              'performed_on': occurrence.value.toIso8601String(),
             });
           }
         }

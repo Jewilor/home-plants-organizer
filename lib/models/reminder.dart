@@ -89,32 +89,46 @@ List<CareReminder> planReminders(
     final day = addDays(today, offset);
     for (final procedure in state.procedures) {
       if (!procedure.occursOn(day)) continue;
-      final completed = procedure.repeats
-          ? (state.completions[procedure.id]?[day] != null)
-          : procedure.isCompleted;
-      if (completed) continue;
       final plant = state.plants
           .where((p) => p.id == procedure.plantId)
           .firstOrNull;
       if (plant == null) continue;
       final prefs = state.reminderPreferences;
-      final time =
+      final fallback =
           prefs.individualWateringTimes && procedure.type == CareType.watering
           ? state.wateringReminderTimes[plant.id] ?? prefs.commonTime
           : prefs.commonTime;
-      final at = DateTime(day.year, day.month, day.day, time.hour, time.minute);
-      if (!at.isAfter(now)) continue;
-      result.add(
-        CareReminder(
-          id: result.length + 1,
-          plantId: plant.id,
-          procedureId: procedure.id,
-          date: at,
-          title: '${procedure.type.label}: ${plant.name}',
-          body:
-              '${plant.room.isEmpty ? '' : '${plant.room}. '}Сегодня запланирована процедура ухода.',
-        ),
-      );
+      for (final occurrence in procedure.occurrencesOn(day)) {
+        final completed = procedure.tracksOccurrences
+            ? (state.completions[procedure.id] ??
+                      const <DateTime, DateTime>{})[procedure.occurrenceKey(
+                    occurrence,
+                  )] !=
+                  null
+            : procedure.isCompleted;
+        if (completed) continue;
+        final at = procedure.hasTimes
+            ? occurrence
+            : DateTime(
+                day.year,
+                day.month,
+                day.day,
+                fallback.hour,
+                fallback.minute,
+              );
+        if (!at.isAfter(now)) continue;
+        result.add(
+          CareReminder(
+            id: result.length + 1,
+            plantId: plant.id,
+            procedureId: procedure.id,
+            date: at,
+            title: '${procedure.type.label}: ${plant.name}',
+            body:
+                '${plant.room.isEmpty ? '' : '${plant.room}. '}Сегодня запланирована процедура ухода.',
+          ),
+        );
+      }
     }
   }
   // Ограничение применяется после сортировки, чтобы позднее событие не вытеснило раннее.

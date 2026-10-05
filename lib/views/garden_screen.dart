@@ -300,7 +300,8 @@ class _GardenScreenState extends State<GardenScreen>
           padding: const EdgeInsets.only(bottom: 12),
           child: PlantCard(
             plant: plant,
-            today: model.today,
+            today: model.now,
+            separateWaterings: model.hasTimedWatering(plant.id),
             onEdit: () => editPlant(plant),
             onDelete: () => confirmDelete(
               'Удалить растение?',
@@ -523,7 +524,9 @@ class _GardenScreenState extends State<GardenScreen>
           ),
         for (final procedure in selected)
           Container(
-            key: ValueKey('procedure-${procedure.id}'),
+            key: ValueKey(
+              'procedure-${procedure.id}${procedure.hasTimes ? '-${procedure.date.toIso8601String()}' : ''}',
+            ),
             margin: const EdgeInsets.only(bottom: 10),
             decoration: BoxDecoration(
               color: procedure.isCompleted
@@ -531,41 +534,83 @@ class _GardenScreenState extends State<GardenScreen>
                   : Colors.white,
               borderRadius: BorderRadius.circular(18),
             ),
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 6,
-              ),
-              title: Text(
-                procedure.type.label,
-                style: const TextStyle(fontWeight: FontWeight.w700, color: ink),
-              ),
-              subtitle: Text(
-                '${model.plantFor(procedure).name}${procedure.fertilizerId.isEmpty ? '' : '\nУдобрение: ${model.references?.find(ReferenceKind.fertilizer, procedure.fertilizerId)?.name ?? 'Запись недоступна'}'}${procedure.repeats ? '\n${procedure.repeatLabel}' : ''}${procedure.isCompleted ? '\nВыполнено ${fullDate(procedure.completedOn!)}' : ''}',
-              ),
-              trailing: PopupMenuButton<String>(
-                key: ValueKey('procedure-menu-${procedure.id}'),
-                tooltip: 'Действия с процедурой',
-                onSelected: (action) {
-                  if (action == 'edit') {
-                    editProcedure(procedure);
-                  } else {
-                    confirmDelete(
-                      procedure.repeats
-                          ? 'Удалить серию повторений?'
-                          : 'Удалить процедуру?',
-                      procedure.repeats
-                          ? 'Все повторения этой процедуры будут удалены. Выполненный уход останется в журнале.'
-                          : '${procedure.type.label}: ${model.plantFor(procedure).name}, ${fullDate(procedure.date)}.',
-                      () => model.deleteProcedure(procedure.id),
-                    );
-                  }
-                },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'edit', child: Text('Редактировать')),
-                  PopupMenuItem(value: 'delete', child: Text('Удалить')),
-                ],
-              ),
+            child: Column(
+              children: [
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  title: Text(
+                    '${procedure.type.label}${procedure.hasTimes ? ' · ${clockLabel(procedure.date.hour * 60 + procedure.date.minute)}' : ''}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: ink,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${model.plantFor(procedure).name}${procedure.fertilizerId.isEmpty ? '' : '\nУдобрение: ${model.references?.find(ReferenceKind.fertilizer, procedure.fertilizerId)?.name ?? 'Запись недоступна'}'}${procedure.repeats ? '\n${procedure.repeatLabel}' : ''}${procedure.isCompleted ? '\nВыполнено ${fullDate(procedure.completedOn!)}' : ''}',
+                  ),
+                  trailing: PopupMenuButton<String>(
+                    key: ValueKey(
+                      'procedure-menu-${procedure.id}${procedure.hasTimes ? '-${procedure.date.toIso8601String()}' : ''}',
+                    ),
+                    tooltip: 'Действия с процедурой',
+                    onSelected: (action) {
+                      if (action == 'edit') {
+                        editProcedure(procedure);
+                      } else {
+                        confirmDelete(
+                          procedure.repeats
+                              ? 'Удалить серию повторений?'
+                              : 'Удалить процедуру?',
+                          procedure.repeats
+                              ? 'Все повторения этой процедуры будут удалены. Выполненный уход останется в журнале.'
+                              : '${procedure.type.label}: ${model.plantFor(procedure).name}, ${fullDate(procedure.date)}.',
+                          () => model.deleteProcedure(procedure.id),
+                        );
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Text('Редактировать'),
+                      ),
+                      PopupMenuItem(value: 'delete', child: Text('Удалить')),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                  child: OutlinedButton.icon(
+                    key: ValueKey(
+                      'complete-${procedure.id}-${procedure.date.toIso8601String()}',
+                    ),
+                    onPressed: dateOnly(procedure.date).isAfter(model.today)
+                        ? null
+                        : () {
+                            try {
+                              model.toggleProcedureCompleted(
+                                procedure.id,
+                                procedure.date,
+                              );
+                            } on ArgumentError catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(e.message.toString())),
+                              );
+                            }
+                          },
+                    icon: Icon(
+                      procedure.isCompleted ? Icons.undo : Icons.check,
+                    ),
+                    label: Text(
+                      procedure.isCompleted
+                          ? 'Отменить выполнение'
+                          : 'Отметить выполнение',
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
       ],
@@ -583,9 +628,11 @@ class PlantCard extends StatelessWidget {
     this.onDelete,
     this.onWater,
     this.onDetails,
+    this.separateWaterings = false,
   });
   final Plant plant;
   final DateTime today;
+  final bool separateWaterings;
   final VoidCallback? onEdit, onDelete, onWater, onDetails;
   @override
   Widget build(BuildContext context) {
@@ -599,12 +646,12 @@ class PlantCard extends StatelessWidget {
       WateringStatus.today => (
         const Color(0xFFFFF1D6),
         const Color(0xFF855600),
-        'Полив сегодня',
+        'Полив сегодня${plant.nextWateringHasTime ? ' в ${clockLabel(plant.nextWatering!.hour * 60 + plant.nextWatering!.minute)}' : ''}',
       ),
       WateringStatus.upcoming => (
         const Color(0xFFEDF3E6),
         forest,
-        'Полив ${fullDate(plant.nextWatering!)}',
+        'Полив ${fullDate(plant.nextWatering!)}${plant.nextWateringHasTime ? ' в ${clockLabel(plant.nextWatering!.hour * 60 + plant.nextWatering!.minute)}' : ''}',
       ),
       WateringStatus.watered => (
         const Color(0xFFE1F1DD),
@@ -704,14 +751,14 @@ class PlantCard extends StatelessWidget {
           ),
           if (status == WateringStatus.overdue)
             Text(
-              'Срок: ${fullDate(plant.nextWatering!)}',
+              'Срок: ${fullDate(plant.nextWatering!)}${plant.nextWateringHasTime ? ' в ${clockLabel(plant.nextWatering!.hour * 60 + plant.nextWatering!.minute)}' : ''}',
               style: TextStyle(color: accent, fontSize: 12),
             ),
           if (status == WateringStatus.watered)
             Text(
               plant.nextWatering == null
                   ? 'Следующий полив не запланирован'
-                  : 'Следующий полив: ${fullDate(plant.nextWatering!)}',
+                  : 'Следующий полив: ${fullDate(plant.nextWatering!)}${plant.nextWateringHasTime ? ' в ${clockLabel(plant.nextWatering!.hour * 60 + plant.nextWatering!.minute)}' : ''}',
               style: const TextStyle(fontSize: 12, color: muted),
             ),
           TextButton.icon(
@@ -733,6 +780,8 @@ class PlantCard extends StatelessWidget {
             label: Text(
               status == WateringStatus.watered
                   ? 'Отменить отметку'
+                  : separateWaterings
+                  ? 'Отметить очередной полив'
                   : 'Полить сегодня',
             ),
           ),

@@ -204,7 +204,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                           leading: const Icon(Icons.check_circle_outline),
                           title: Text(record.type.label),
                           subtitle: Text(
-                            '${fullDate(record.performedOn)}${record.note.isEmpty ? '' : '\n${record.note}'}',
+                            '${fullDate(record.performedOn)}${record.procedureId.isEmpty ? '' : ' в ${clockLabel(record.performedOn.hour * 60 + record.performedOn.minute)}'}${record.note.isEmpty ? '' : '\n${record.note}'}',
                           ),
                         ),
                       ),
@@ -238,12 +238,14 @@ class CareRecordEditor extends StatefulWidget {
 class _CareRecordEditorState extends State<CareRecordEditor> {
   CareType type = CareType.watering;
   late DateTime date;
+  late TimeOfDay performedTime;
   final note = TextEditingController();
   String? error;
   @override
   void initState() {
     super.initState();
     date = widget.garden.today;
+    performedTime = TimeOfDay.fromDateTime(widget.garden.now);
   }
 
   @override
@@ -257,7 +259,13 @@ class _CareRecordEditorState extends State<CareRecordEditor> {
       widget.garden.recordCare(
         plantId: widget.plantId,
         type: type,
-        performedOn: date,
+        performedOn: DateTime(
+          date.year,
+          date.month,
+          date.day,
+          performedTime.hour,
+          performedTime.minute,
+        ),
         note: note.text,
       );
       Navigator.pop(context);
@@ -292,6 +300,27 @@ class _CareRecordEditorState extends State<CareRecordEditor> {
               date: date,
               lastDate: widget.garden.today,
               onChanged: (v) => setState(() => date = v),
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.schedule),
+              label: Text(
+                'Время ухода: ${clockLabel(performedTime.hour * 60 + performedTime.minute)}',
+              ),
+              onPressed: () async {
+                final picked = await showTimePicker(
+                  context: context,
+                  initialTime: performedTime,
+                  builder: (context, child) => MediaQuery(
+                    data: MediaQuery.of(
+                      context,
+                    ).copyWith(alwaysUse24HourFormat: true),
+                    child: child!,
+                  ),
+                );
+                if (picked != null && mounted) {
+                  setState(() => performedTime = picked);
+                }
+              },
             ),
             TextField(
               controller: note,

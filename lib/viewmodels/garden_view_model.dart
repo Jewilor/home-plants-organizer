@@ -181,6 +181,7 @@ class GardenViewModel extends ChangeNotifier {
 
   final DateTime Function() _clock;
   late DateTime today;
+  DateTime get now => _clock();
   late DateTime selectedDate;
   late DateTime visibleMonth;
   late final List<Plant> _plants;
@@ -201,18 +202,28 @@ class GardenViewModel extends ChangeNotifier {
   CareProcedure procedureById(String id) =>
       _procedures.firstWhere((p) => p.id == id);
 
-  DateTime? _completion(CareProcedure p, DateTime day) => p.repeats
-      ? (_completions[p.id] ?? const <DateTime, DateTime>{})[dateOnly(day)]
+  DateTime? _completion(CareProcedure p, DateTime at) => p.tracksOccurrences
+      ? (_completions[p.id] ?? const <DateTime, DateTime>{})[p.occurrenceKey(
+          at,
+        )]
       : p.completedOn;
 
+  /// Находит самое раннее невыполненное событие, учитывая все часы дня.
   DateTime? _nextPending(CareProcedure p) {
-    if (!p.repeats) return p.isCompleted ? null : p.date;
-    var day = dateOnly(p.date);
-    while (_completion(p, day) != null) {
-      day = addDays(day, p.intervalDays);
+    if (!p.tracksOccurrences && p.isCompleted) return null;
+    var day = p.nextDayOnOrAfter(p.date);
+    while (day != null) {
+      for (final at in p.occurrencesOn(day)) {
+        if (_completion(p, at) == null) return at;
+      }
+      day = p.nextDayOnOrAfter(addDays(day, 1));
     }
-    return day;
+    return null;
   }
+
+  bool hasTimedWatering(String plantId) => _procedures.any(
+    (p) => p.plantId == plantId && p.type == CareType.watering && p.hasTimes,
+  );
 
   /// Срок ближайшего незавершённого полива вычисляется из расписания.
   List<Plant> get plants => List.unmodifiable(
@@ -244,18 +255,28 @@ class GardenViewModel extends ChangeNotifier {
         art: plant.art,
         nextWatering: pending.isEmpty ? null : pending.first,
         lastWateredOn: completed.isEmpty ? null : completed.last,
+        nextWateringHasTime:
+            pending.isNotEmpty &&
+            _procedures.any(
+              (p) =>
+                  p.plantId == plant.id &&
+                  p.type == CareType.watering &&
+                  p.hasTimes &&
+                  _nextPending(p) == pending.first,
+            ),
       );
     }),
   );
 
   /// Количество карточек с просроченным поливом относительно текущего дня.
   int get overdueCount =>
-      plants.where((p) => p.statusAt(today) == WateringStatus.overdue).length;
+      plants.where((p) => p.statusAt(now) == WateringStatus.overdue).length;
 
   /// Вычисляет повторы только для запрошенного дня без генерации бесконечного списка.
   List<CareProcedure> proceduresOn(DateTime date) => [
     for (final p in _procedures)
-      if (p.occursOn(date)) p.occurrence(date, _completion(p, date)),
+      for (final at in p.occurrencesOn(date))
+        p.occurrence(at, _completion(p, at)),
   ];
 
   /// Находит актуальное растение, поэтому переименование видно и в календаре.
@@ -272,6 +293,9 @@ class GardenViewModel extends ChangeNotifier {
     String? familyId,
     DateTime? firstWatering,
     bool weekly = false,
+    int repeatEveryDays = 0,
+    List<int> weekdays = const [],
+    List<int> times = const [],
   }) {
     if (familyId != null &&
         familyId.isNotEmpty &&
@@ -281,6 +305,12 @@ class GardenViewModel extends ChangeNotifier {
         'Выберите существующее семейство и дождитесь сохранения справочника.',
       );
     }
+    final schedule = _validateSchedule(
+      weekly,
+      repeatEveryDays,
+      weekdays,
+      times,
+    );
     final clean = name.trim();
     if (clean.isEmpty) throw ArgumentError('Введите название растения.');
     if (clean.length > 80 ||
@@ -312,6 +342,9 @@ class GardenViewModel extends ChangeNotifier {
             date: dateOnly(firstWatering),
             type: CareType.watering,
             weekly: weekly,
+            repeatEveryDays: repeatEveryDays,
+            weekdays: schedule.$1,
+            times: schedule.$2,
           ),
         );
       }
@@ -337,21 +370,57 @@ class GardenViewModel extends ChangeNotifier {
     _saveChanged();
   }
 
-  bool _overlaps(CareProcedure a, CareProcedure b) {
-    if (a.repeats && b.repeats) {
-      final difference = DateTime.utc(
-        a.date.year,
-        a.date.month,
-        a.date.day,
-      ).difference(DateTime.utc(b.date.year, b.date.month, b.date.day)).inDays;
-      return difference % a.intervalDays.gcd(b.intervalDays) == 0;
+  /// Проверяет данные формы до изменения сада; коллекции сохраняются неизменяемыми.
+  (List<int>, List<int>) _validateSchedule(
+    bool weekly,
+    int interval,
+    List<int> weekdays,
+    List<int> times,
+  ) {
+    if (interval < 0 || interval > 365) {
+      throw ArgumentError('Укажите интервал от 1 до 365 дней.');
     }
-    if (a.repeats) return a.occursOn(b.date);
-    if (b.repeats) return b.occursOn(a.date);
-    return sameDay(a.date, b.date);
+    if (weekdays.any((day) => day < 1 || day > 7) ||
+        weekdays.toSet().length != weekdays.length ||
+        (weekdays.isNotEmpty && (weekly || interval > 0))) {
+      throw ArgumentError('Выберите дни недели либо интервал повторения.');
+    }
+    if (times.any((minute) => minute < 0 || minute >= 1440) ||
+        times.toSet().length != times.length) {
+      throw ArgumentError('Укажите разные корректные времена процедур.');
+    }
+    return (
+      List<int>.unmodifiable(List<int>.of(weekdays)..sort()),
+      List<int>.unmodifiable(List<int>.of(times)..sort()),
+    );
   }
 
-  /// Сохраняет однократную процедуру или недельную серию.
+  /// Проверяет пересечение календарных дней и часов без ограничения горизонтом.
+  bool _overlaps(CareProcedure a, CareProcedure b) {
+    if (a.hasTimes &&
+        b.hasTimes &&
+        !a.times.any((minute) => b.times.contains(minute))) {
+      return false;
+    }
+    if (!a.repeats) return b.occursOn(a.date);
+    if (!b.repeats) return a.occursOn(b.date);
+    if (a.weekdays.isNotEmpty && b.weekdays.isNotEmpty) {
+      return a.weekdays.any((day) => b.weekdays.contains(day));
+    }
+    if (a.weekdays.isNotEmpty || b.weekdays.isNotEmpty) {
+      final byWeek = a.weekdays.isNotEmpty ? a : b;
+      final byInterval = a.weekdays.isNotEmpty ? b : a;
+      final divisor = byInterval.intervalDays.gcd(7);
+      return byWeek.weekdays.any(
+        (day) => (day - byInterval.date.weekday) % divisor == 0,
+      );
+    }
+    return calendarDaysBetween(a.date, b.date) %
+            a.intervalDays.gcd(b.intervalDays) ==
+        0;
+  }
+
+  /// Сохраняет одну дату, интервал дней или выбранные дни недели и часы.
   /// При редактировании серии меняются все её будущие даты; история сохраняется.
   String saveProcedure({
     String? id,
@@ -361,15 +430,18 @@ class GardenViewModel extends ChangeNotifier {
     bool weekly = false,
     String fertilizerId = '',
     int repeatEveryDays = 0,
+    List<int> weekdays = const [],
+    List<int> times = const [],
   }) {
     if (!_plants.any((p) => p.id == plantId)) {
       throw ArgumentError('Выберите существующее растение.');
     }
-    if (repeatEveryDays < 0 || repeatEveryDays > 365) {
-      throw ArgumentError(
-        'Интервал должен быть от 1 до 365 дней либо 0 для одной даты.',
-      );
-    }
+    final schedule = _validateSchedule(
+      weekly,
+      repeatEveryDays,
+      weekdays,
+      times,
+    );
     final fertilizer = type == CareType.feeding ? fertilizerId : '';
     if (fertilizer.isNotEmpty &&
         (references?.saving == true ||
@@ -387,8 +459,9 @@ class GardenViewModel extends ChangeNotifier {
         old.plantId == plantId &&
         old.type == type &&
         sameDay(old.date, day) &&
-        old.weekly == weekly &&
-        old.repeatEveryDays == repeatEveryDays;
+        old.intervalDays == (weekly ? 7 : repeatEveryDays) &&
+        listEquals(old.weekdays, schedule.$1) &&
+        listEquals(old.times, schedule.$2);
     final p = CareProcedure(
       id: id ?? _newId('procedure'),
       plantId: plantId,
@@ -397,6 +470,8 @@ class GardenViewModel extends ChangeNotifier {
       weekly: weekly,
       fertilizerId: fertilizer,
       repeatEveryDays: repeatEveryDays,
+      weekdays: schedule.$1,
+      times: schedule.$2,
       completedOn: unchanged ? old.completedOn : null,
     );
     if (_procedures.any(
@@ -416,8 +491,8 @@ class GardenViewModel extends ChangeNotifier {
     } else {
       _procedures[index] = p;
     }
-    selectedDate = day;
-    visibleMonth = DateTime(day.year, day.month);
+    selectedDate = p.nextDayOnOrAfter(day) ?? day;
+    visibleMonth = DateTime(selectedDate.year, selectedDate.month);
     _saveChanged();
     return p.id;
   }
@@ -429,16 +504,17 @@ class GardenViewModel extends ChangeNotifier {
     _saveChanged();
   }
 
+  /// Прежняя дневная отметка закрывает только расписания без отдельных часов.
   void _markDue(String plantId, CareType type, DateTime performedOn) {
     for (var i = 0; i < _procedures.length; i++) {
       final p = _procedures[i];
-      if (p.plantId != plantId || p.type != type) continue;
+      if (p.plantId != plantId || p.type != type || p.hasTimes) continue;
       if (p.repeats) {
         final entries = _completions.putIfAbsent(p.id, () => {});
         for (
-          var day = dateOnly(p.date);
-          !day.isAfter(performedOn);
-          day = addDays(day, p.intervalDays)
+          var day = p.nextDayOnOrAfter(p.date);
+          day != null && !day.isAfter(dateOnly(performedOn));
+          day = p.nextDayOnOrAfter(addDays(day, 1))
         ) {
           entries.putIfAbsent(day, () => performedOn);
         }
@@ -448,7 +524,72 @@ class GardenViewModel extends ChangeNotifier {
     }
   }
 
-  /// Записывает факт ухода. Будущую дату и повтор того же вида за день запрещает.
+  /// Различает две записи даже при совпадении показаний часов до микросекунды.
+  DateTime _uniquePerformedTime(String plantId, CareType type, DateTime at) {
+    var result = at;
+    while (_records.any(
+      (r) => r.plantId == plantId && r.type == type && r.performedOn == result,
+    )) {
+      result = result.add(const Duration(microseconds: 1));
+    }
+    return result;
+  }
+
+  void _completeOccurrence(
+    CareProcedure p,
+    DateTime at,
+    DateTime performedOn,
+    String note,
+  ) {
+    final actual = _uniquePerformedTime(p.plantId, p.type, performedOn);
+    if (p.tracksOccurrences) {
+      _completions.putIfAbsent(p.id, () => {})[p.occurrenceKey(at)] = actual;
+    } else {
+      final index = _procedures.indexWhere((other) => other.id == p.id);
+      _procedures[index] = p.withCompletion(actual);
+    }
+    _records.add(
+      CareRecord(
+        id: _newId('record'),
+        plantId: p.plantId,
+        type: p.type,
+        performedOn: actual,
+        note: note.trim(),
+        procedureId: p.id,
+        scheduledFor: p.occurrenceKey(at),
+      ),
+    );
+  }
+
+  /// Отмечает или отменяет одно событие, сохраняя остальные поливы этого дня.
+  void toggleProcedureCompleted(String procedureId, DateTime at) {
+    refreshToday();
+    final p = procedureById(procedureId);
+    final key = p.occurrenceKey(at);
+    if (!p.occurrencesOn(at).contains(key)) {
+      throw ArgumentError('Событие больше не входит в расписание.');
+    }
+    if (dateOnly(at).isAfter(today)) {
+      throw ArgumentError('Нельзя отметить уход за будущий день.');
+    }
+    if (_completion(p, key) != null) {
+      _records.removeWhere(
+        (r) => r.procedureId == p.id && r.scheduledFor == key,
+      );
+      if (p.tracksOccurrences) {
+        _completions[p.id]?.remove(key);
+      } else {
+        final index = _procedures.indexWhere((other) => other.id == p.id);
+        _procedures[index] = p.withCompletion(null);
+      }
+    } else {
+      _completeOccurrence(p, key, _clock(), '');
+    }
+    _saveChanged();
+  }
+
+  /// Записывает один факт ухода и закрывает одно событие расписания с часами.
+  /// Без отдельных часов сохраняется одна запись вида ухода за день.
   void recordCare({
     required String plantId,
     required CareType type,
@@ -466,19 +607,40 @@ class GardenViewModel extends ChangeNotifier {
     if (note.trim().length > 300) {
       throw ArgumentError('Сократите примечание до 300 символов.');
     }
+    final timed =
+        proceduresOn(day)
+            .where((p) => p.plantId == plantId && p.type == type && p.hasTimes)
+            .toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
+    if (timed.isNotEmpty) {
+      final pending = timed.where((p) => !p.isCompleted).firstOrNull;
+      if (pending == null) {
+        throw ArgumentError(
+          'Все процедуры этого вида на выбранный день уже выполнены.',
+        );
+      }
+      _completeOccurrence(
+        procedureById(pending.id),
+        pending.date,
+        performedOn,
+        note,
+      );
+      _saveChanged();
+      return;
+    }
     if (_records.any(
       (r) =>
           r.plantId == plantId && r.type == type && sameDay(r.performedOn, day),
     )) {
       throw ArgumentError('Такая запись ухода уже есть на выбранный день.');
     }
-    _markDue(plantId, type, day);
+    _markDue(plantId, type, performedOn);
     _records.add(
       CareRecord(
         id: _newId('record'),
         plantId: plantId,
         type: type,
-        performedOn: day,
+        performedOn: performedOn,
         note: note.trim(),
       ),
     );
@@ -489,6 +651,47 @@ class GardenViewModel extends ChangeNotifier {
   /// Недельная серия после выполнения сохраняет будущие повторения.
   void toggleWateredToday(String plantId) {
     refreshToday();
+    if (hasTimedWatering(plantId)) {
+      final pending = <(CareProcedure, DateTime)>[];
+      for (final p in _procedures.where(
+        (p) =>
+            p.plantId == plantId && p.type == CareType.watering && p.hasTimes,
+      )) {
+        final at = _nextPending(p);
+        if (at != null && !dateOnly(at).isAfter(today)) pending.add((p, at));
+      }
+      pending.sort((a, b) => a.$2.compareTo(b.$2));
+      if (pending.isNotEmpty) {
+        toggleProcedureCompleted(pending.first.$1.id, pending.first.$2);
+        return;
+      }
+      final completed =
+          _records
+              .where(
+                (r) =>
+                    r.plantId == plantId &&
+                    r.type == CareType.watering &&
+                    r.procedureId.isNotEmpty &&
+                    sameDay(r.performedOn, today) &&
+                    _procedures.any(
+                      (p) =>
+                          p.id == r.procedureId &&
+                          r.scheduledFor != null &&
+                          p
+                              .occurrencesOn(r.scheduledFor!)
+                              .contains(r.scheduledFor),
+                    ),
+              )
+              .toList()
+            ..sort((a, b) => b.performedOn.compareTo(a.performedOn));
+      if (completed.isNotEmpty) {
+        toggleProcedureCompleted(
+          completed.first.procedureId,
+          completed.first.scheduledFor!,
+        );
+        return;
+      }
+    }
     final logged = _records.any(
       (r) =>
           r.plantId == plantId &&
@@ -687,7 +890,7 @@ class GardenViewModel extends ChangeNotifier {
     final current = dateOnly(_clock());
     if (current != today) {
       today = current;
-      notifyListeners();
     }
+    notifyListeners();
   }
 }

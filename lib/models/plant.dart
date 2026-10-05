@@ -34,6 +34,7 @@ class Plant {
     this.familyId = '',
     this.nextWatering,
     this.lastWateredOn,
+    this.nextWateringHasTime = false,
     required this.art,
   });
   final String id;
@@ -49,23 +50,28 @@ class Plant {
   // These dates are derived by the ViewModel from the procedures.
   final DateTime? nextWatering;
   final DateTime? lastWateredOn;
+  final bool nextWateringHasTime;
   final int art;
 
   /// Возвращает состояние полива относительно указанной даты.
   WateringStatus statusAt(DateTime now) {
+    final due = nextWatering;
+    final today = dateOnly(now);
+    if (due != null &&
+        (dateOnly(due).isBefore(today) ||
+            (nextWateringHasTime && due.isBefore(now)))) {
+      return WateringStatus.overdue;
+    }
+    if (due != null && sameDay(due, today)) return WateringStatus.today;
     if (lastWateredOn != null && sameDay(lastWateredOn!, now)) {
       return WateringStatus.watered;
     }
-    if (nextWatering == null) return WateringStatus.unscheduled;
-    final due = dateOnly(nextWatering!);
-    final today = dateOnly(now);
-    if (due.isBefore(today)) return WateringStatus.overdue;
-    if (due == today) return WateringStatus.today;
-    return WateringStatus.upcoming;
+    return due == null ? WateringStatus.unscheduled : WateringStatus.upcoming;
   }
 }
 
-/// Модель одной процедуры ухода, связанной с растением по идентификатору.
+/// Расписание ухода: одна дата, интервал дней либо выбранные дни недели.
+/// Времена хранятся в минутах от полуночи; пустой список использует настройки напоминаний.
 class CareProcedure {
   const CareProcedure({
     this.id = '',
@@ -76,6 +82,8 @@ class CareProcedure {
     this.weekly = false,
     this.fertilizerId = '',
     this.repeatEveryDays = 0,
+    this.weekdays = const [],
+    this.times = const [],
   });
   final String id;
   final String plantId;
@@ -83,56 +91,107 @@ class CareProcedure {
   final CareType type;
   final DateTime? completedOn;
 
-  /// Повторять процедуру каждые семь календарных дней от даты начала.
+  /// Прежний недельный режим сохраняется для чтения существующих расписаний.
   final bool weekly;
-
-  /// Произвольный интервал повторения; недельный режим сохраняет прежние записи.
   final int repeatEveryDays;
-  int get intervalDays => weekly ? 7 : repeatEveryDays;
-  bool get repeats => intervalDays > 0;
-  String get repeatLabel =>
-      weekly ? 'Еженедельно' : 'Каждые $intervalDays дней';
 
-  /// Тип удобрения для подкормки; пустая строка означает отсутствие выбора.
+  /// Дни недели от понедельника (1) до воскресенья (7).
+  final List<int> weekdays;
+
+  /// Отдельные времена процедур от 0 до 1439 минут; без повторяющихся значений.
+  final List<int> times;
+  bool get hasTimes => times.isNotEmpty;
+  bool get tracksOccurrences => repeats || hasTimes;
+  int get intervalDays => weekly ? 7 : repeatEveryDays;
+  bool get repeats => weekdays.isNotEmpty || intervalDays > 0;
+  String get repeatLabel => weekdays.isNotEmpty
+      ? 'По дням недели: ${weekdays.map((d) => weekdayLabels[d - 1]).join(', ')}'
+      : intervalDays == 1
+      ? 'Ежедневно'
+      : intervalDays == 7
+      ? 'Раз в неделю'
+      : intervalDays > 0
+      ? 'Каждые $intervalDays дней'
+      : 'Одна дата';
   final String fertilizerId;
 
-  /// Проверяет, относится ли день к однократной процедуре или недельной серии.
+  /// Проверяет день относительно начала расписания, не создавая список повторений.
   bool occursOn(DateTime day) {
     final start = dateOnly(date);
     final target = dateOnly(day);
-    final difference = DateTime.utc(
-      target.year,
-      target.month,
-      target.day,
-    ).difference(DateTime.utc(start.year, start.month, start.day)).inDays;
+    if (target.isBefore(start)) return false;
+    if (weekdays.isNotEmpty) return weekdays.contains(target.weekday);
+    final difference = calendarDaysBetween(start, target);
     return difference == 0 ||
-        (repeats && difference >= 0 && difference % intervalDays == 0);
+        (intervalDays > 0 && difference % intervalDays == 0);
   }
 
-  /// Создаёт отображаемый экземпляр серии для конкретной даты.
-  CareProcedure occurrence(DateTime day, DateTime? completion) => CareProcedure(
+  /// Находит ближайший день серии за постоянное число шагов.
+  DateTime? nextDayOnOrAfter(DateTime from) {
+    var day = dateOnly(from).isBefore(dateOnly(date))
+        ? dateOnly(date)
+        : dateOnly(from);
+    if (weekdays.isNotEmpty) {
+      for (var i = 0; i < 7; i++) {
+        if (weekdays.contains(day.weekday)) return day;
+        day = addDays(day, 1);
+      }
+      return null;
+    }
+    if (intervalDays <= 0) return sameDay(day, date) ? dateOnly(date) : null;
+    final remainder = calendarDaysBetween(dateOnly(date), day) % intervalDays;
+    return remainder == 0 ? day : addDays(day, intervalDays - remainder);
+  }
+
+  /// Возвращает отдельные события дня, в том числе несколько процедур одного вида.
+  Iterable<DateTime> occurrencesOn(DateTime day) sync* {
+    if (!occursOn(day)) return;
+    if (!hasTimes) {
+      yield dateOnly(day);
+    } else {
+      for (final minutes in times) {
+        yield DateTime(
+          day.year,
+          day.month,
+          day.day,
+          minutes ~/ 60,
+          minutes % 60,
+        );
+      }
+    }
+  }
+
+  /// Ключ выполнения включает время только у расписаний с отдельными часами.
+  DateTime occurrenceKey(DateTime at) => hasTimes ? at : dateOnly(at);
+
+  /// Создаёт отображаемое событие, сохраняя идентификатор исходного расписания.
+  CareProcedure occurrence(DateTime at, DateTime? completion) => CareProcedure(
     id: id,
     plantId: plantId,
-    date: dateOnly(day),
+    date: at,
     type: type,
     weekly: weekly,
     repeatEveryDays: repeatEveryDays,
+    weekdays: weekdays,
+    times: times,
     fertilizerId: fertilizerId,
     completedOn: completion,
   );
-
-  /// Показывает, была ли процедура отмечена выполненной.
   bool get isCompleted => completedOn != null;
 
-  /// Создаёт копию процедуры с новой отметкой выполнения.
-  CareProcedure withCompletion(DateTime? value) => CareProcedure(
-    id: id,
-    plantId: plantId,
-    date: date,
-    type: type,
-    completedOn: value,
-    weekly: weekly,
-    repeatEveryDays: repeatEveryDays,
-    fertilizerId: fertilizerId,
-  );
+  /// Создаёт копию однократной процедуры с изменённой отметкой выполнения.
+  CareProcedure withCompletion(DateTime? value) => occurrence(date, value);
 }
+
+const weekdayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+/// Считает календарные дни без влияния переходов часового пояса.
+int calendarDaysBetween(DateTime start, DateTime end) => DateTime.utc(
+  end.year,
+  end.month,
+  end.day,
+).difference(DateTime.utc(start.year, start.month, start.day)).inDays;
+
+/// Форматирует выбранное время процедуры для русского интерфейса.
+String clockLabel(int minutes) =>
+    '${(minutes ~/ 60).toString().padLeft(2, '0')}:${(minutes % 60).toString().padLeft(2, '0')}';
