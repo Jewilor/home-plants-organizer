@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/reference_entry.dart';
+import '../models/plant_family.dart';
 import '../services/reference_repository.dart';
 
 /// Управляет редактированием справочников и проверяет использование их записей.
@@ -80,6 +81,25 @@ class ReferenceViewModel extends ChangeNotifier {
       saving = false;
       _emit();
     }
+  }
+
+  /// Возвращает существующее семейство либо сохраняет новое из энциклопедии.
+  /// Научное и русское названия известных семейств считаются одной записью.
+  Future<String> ensureFamily(String name) async {
+    if (saving) throw ArgumentError('Дождитесь сохранения справочника.');
+    final clean = canonicalFamilyName(name);
+    if (clean.isEmpty || clean.length > 80) {
+      throw ArgumentError('Некорректное название семейства.');
+    }
+    final key = familyNameKey(clean);
+    for (final entry in _families) {
+      if (familyNameKey(entry.name) == key) return entry.id;
+    }
+    return saveEntry(
+      kind: ReferenceKind.family,
+      name: clean,
+      icon: ReferenceIcon.leaf,
+    );
   }
 
   /// Не позволяет удалить семейство или удобрение, пока на него ссылается сад.

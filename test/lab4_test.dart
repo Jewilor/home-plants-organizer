@@ -102,6 +102,7 @@ void main() {
       final result = await api.fetch('  Ficus elastica  ');
       expect(result.wateringIntervalDays, 10);
       expect(result.species, 'Ficus elastica');
+      expect(result.family, 'Тутовые');
     },
   );
   test(
@@ -184,6 +185,7 @@ void main() {
             jsonEncode({
               'id': 21,
               'scientific_name': ['Ficus elastica'],
+              'family': 'Moraceae',
               'watering': 'Average',
               'sunlight': ['Part shade'],
               'watering_general_benchmark': {'value': '5-10', 'unit': 'days'},
@@ -196,6 +198,7 @@ void main() {
       final result = await api.fetch('Ficus elastica');
       expect(result.wateringIntervalDays, 10);
       expect(result.light, 'Полутень');
+      expect(result.family, 'Тутовые');
       expect(result.humidity, contains('не предоставлены'));
     },
   );

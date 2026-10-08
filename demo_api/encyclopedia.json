@@ -11,7 +11,8 @@
       "watering": "Проверять влажность почвы перед поливом. Интервал ниже задан для учебной демонстрации расписания.",
       "wateringIntervalDays": 7,
       "sourceName": "Учебная энциклопедия – демонстрационные данные",
-      "sourceUrl": "https://github.com/Jewilor/home-plants-organizer/tree/main/demo_api"
+      "sourceUrl": "https://github.com/Jewilor/home-plants-organizer/tree/main/demo_api",
+      "family": "Araceae"
     },
     {
       "species": "Ficus elastica",
@@ -24,7 +25,8 @@
       "watering": "Проверять влажность почвы перед поливом. Интервал ниже задан для учебной демонстрации расписания.",
       "wateringIntervalDays": 10,
       "sourceName": "Учебная энциклопедия – демонстрационные данные",
-      "sourceUrl": "https://github.com/Jewilor/home-plants-organizer/tree/main/demo_api"
+      "sourceUrl": "https://github.com/Jewilor/home-plants-organizer/tree/main/demo_api",
+      "family": "Moraceae"
     },
     {
       "species": "Spathiphyllum wallisii",
@@ -37,7 +39,8 @@
       "watering": "Проверять влажность почвы перед поливом. Интервал ниже задан для учебной демонстрации расписания.",
       "wateringIntervalDays": 7,
       "sourceName": "Учебная энциклопедия – демонстрационные данные",
-      "sourceUrl": "https://github.com/Jewilor/home-plants-organizer/tree/main/demo_api"
+      "sourceUrl": "https://github.com/Jewilor/home-plants-organizer/tree/main/demo_api",
+      "family": "Araceae"
     },
     {
       "species": "Dracaena trifasciata",
@@ -51,7 +54,8 @@
       "watering": "Проверять влажность почвы перед поливом. Интервал ниже задан для учебной демонстрации расписания.",
       "wateringIntervalDays": 14,
       "sourceName": "Учебная энциклопедия – демонстрационные данные",
-      "sourceUrl": "https://github.com/Jewilor/home-plants-organizer/tree/main/demo_api"
+      "sourceUrl": "https://github.com/Jewilor/home-plants-organizer/tree/main/demo_api",
+      "family": "Asparagaceae"
     },
     {
       "species": "Aglaonema",
@@ -65,7 +69,8 @@
       "watering": "Проверять влажность почвы перед поливом. Интервал ниже задан для учебной демонстрации расписания.",
       "wateringIntervalDays": 7,
       "sourceName": "Учебная энциклопедия – демонстрационные данные",
-      "sourceUrl": "https://github.com/Jewilor/home-plants-organizer/tree/main/demo_api"
+      "sourceUrl": "https://github.com/Jewilor/home-plants-organizer/tree/main/demo_api",
+      "family": "Araceae"
     }
   ]
 }

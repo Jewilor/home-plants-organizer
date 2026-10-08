@@ -224,6 +224,7 @@ class HttpPlantEncyclopedia implements PlantEncyclopedia {
     }
     return CareGuide.fromJson({
       'species': names.first,
+      'family': details['family'],
       'light': light,
       'humidity': 'Сведения о влажности воздуха не предоставлены сервисом.',
       'watering':

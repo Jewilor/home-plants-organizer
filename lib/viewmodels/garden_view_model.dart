@@ -723,7 +723,8 @@ class GardenViewModel extends ChangeNotifier {
     _saveChanged();
   }
 
-  /// Сохраняет полученную справку и атомарно заменяет расписание полива при выборе.
+  /// Сохраняет семейство в справочнике, связывает карточку и применяет регламент.
+  /// Регламент и расписание записываются в одной транзакции основной базы.
   /// Другие виды ухода, ручные условия содержания и фактический журнал сохраняются.
   Future<void> applyCareGuide(
     String plantId,
@@ -737,6 +738,35 @@ class GardenViewModel extends ChangeNotifier {
     if (firstWatering != null &&
         (intervalDays == null || intervalDays < 1 || intervalDays > 365)) {
       throw ArgumentError('Укажите интервал полива от 1 до 365 дней.');
+    }
+    // Запись Hive завершается до изменения карточки и согласованной записи SQLite.
+    // Отсутствие семейства в ответе не стирает ручной выбор пользователя.
+    final catalog = references;
+    final familyId = guide.family.trim().isNotEmpty && catalog != null
+        ? await catalog.ensureFamily(guide.family)
+        : null;
+    final index = _plants.indexWhere((plant) => plant.id == plantId);
+    if (_disposed || index < 0) {
+      throw ArgumentError('Растение уже удалено или сад закрыт.');
+    }
+    if (familyId != null) {
+      if (catalog!.saving ||
+          catalog.find(ReferenceKind.family, familyId) == null) {
+        throw ArgumentError('Семейство изменилось. Повторите сохранение.');
+      }
+      final plant = _plants[index];
+      _plants[index] = Plant(
+        id: plant.id,
+        name: plant.name,
+        species: plant.species,
+        room: plant.room,
+        careConditions: plant.careConditions,
+        familyId: familyId,
+        art: plant.art,
+        nextWatering: plant.nextWatering,
+        lastWateredOn: plant.lastWateredOn,
+        nextWateringHasTime: plant.nextWateringHasTime,
+      );
     }
     _careGuides[plantId] = guide;
     if (firstWatering != null) {

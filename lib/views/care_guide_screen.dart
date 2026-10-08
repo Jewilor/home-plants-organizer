@@ -23,6 +23,13 @@ class CareGuideCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(guide.species),
+          const SizedBox(height: 8),
+          Text(
+            guide.family.isEmpty
+                ? 'Семейство: не указано в энциклопедии.'
+                : 'Семейство: ${guide.family}',
+            key: const ValueKey('care-guide-family'),
+          ),
           const SizedBox(height: 12),
           const Text(
             'Освещение',
@@ -187,6 +194,15 @@ class _CareGuideScreenState extends State<CareGuideScreen> {
             if (model.guide != null) ...[
               const SizedBox(height: 12),
               CareGuideCard(guide: model.guide!),
+              if (model.guide!.family.isNotEmpty &&
+                  widget.garden.references != null)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'При сохранении семейство будет выбрано для растения. '
+                    'Если его нет в справочнике, оно добавится автоматически.',
+                  ),
+                ),
               CheckboxListTile(
                 key: const ValueKey('care-create-schedule'),
                 value: schedule,

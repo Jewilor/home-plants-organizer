@@ -1,3 +1,5 @@
+import 'plant_family.dart';
+
 /// Регламент ухода, полученный по сети и сохраняемый отдельно от ручной справки.
 class CareGuide {
   const CareGuide({
@@ -9,8 +11,12 @@ class CareGuide {
     required this.sourceUrl,
     required this.downloadedAt,
     this.wateringIntervalDays,
+    this.family = '',
   });
   final String species, light, humidity, watering, sourceName, sourceUrl;
+
+  /// Семейство из энциклопедии; пустое значение совместимо со старыми справками.
+  final String family;
   final DateTime downloadedAt;
   final int? wateringIntervalDays;
 
@@ -24,6 +30,10 @@ class CareGuide {
       return value.trim();
     }
 
+    final family = json['family'];
+    if (family != null && (family is! String || family.trim().length > 80)) {
+      throw const FormatException('Некорректное семейство растения.');
+    }
     final days = json['wateringIntervalDays'];
     if (days != null && (days is! int || days < 1 || days > 365)) {
       throw const FormatException('Некорректный интервал полива.');
@@ -36,6 +46,7 @@ class CareGuide {
     }
     return CareGuide(
       species: text('species'),
+      family: canonicalFamilyName(family as String? ?? ''),
       light: text('light'),
       humidity: text('humidity'),
       watering: text('watering'),
@@ -49,6 +60,7 @@ class CareGuide {
   /// Преобразует регламент в JSON для долговременного хранения в SQLite.
   Map<String, dynamic> toJson() => {
     'species': species,
+    'family': family,
     'light': light,
     'humidity': humidity,
     'watering': watering,
